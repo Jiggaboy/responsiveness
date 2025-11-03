@@ -1,0 +1,22 @@
+# Thoughs about the statistics of the population response
+The statistics differ depending on whether we average first and then calculate the delays, 
+or average the delays of individual runs.
+
+Averaging first decreases the standard deviation of the bins, which moreover scale inversely to the bin size.
+Small bins naturally have a large standard deviation.
+The standard deviation might lie inside the 'signal' of the transient, hence giving odd results.
+
+Averaging across multiple runs does not change the std of the spike raster, but improves the estimator of the mean,
+ie the signal.
+
+- [ ] How does the standard deviation scale with N, but also with the number of seed. Does it change?
+	And with the binsize. And the FR (cf. delta FR also).
+
+
+Update on the okt 7:
+
+The bootrapping approach is good and gives an estimate of the delay distribution.
+
+The delay estimate depends on the length of the simulation. 
+The length of the simulation does not display a difference in mean\median delay.
+Longer simulations exhibit lower variance in the delay estimation.
