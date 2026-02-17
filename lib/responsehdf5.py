@@ -36,12 +36,16 @@ run_tag = "run"
 id_tag = "run_id"
 senders_tag = "senders"
 spikes_tag = "spikes"
+exc_tag = "excitatory"
+inh_tag = "inhibitory"
 time_tag = "time"
 Vm_tag = "Vm"
 seed_tag = "seed"
 spikes_by_sender_tag = "spikes_by_sender"
 binwidth_tag = "binwidth"
 entropy_tag = "entropy"
+dist_pre_tag = "dist_pre"
+dist_post_tag = "dist_post"
 delay_tag = "delay_steps"
 SEM_tag = "SEM"
 
@@ -160,17 +164,22 @@ class ResponseHdf5(tb.File):
         return run_id
         
         
-    def add_data_to_run(self, run_id:int, senders:np.ndarray, spikes:np.ndarray, time:np.ndarray, Vm:np.ndarray):
-        run_data = self.create_group(self.data, run_tag+str(run_id))
+    def add_data_to_run(self, run_id:int, senders:np.ndarray, spikes:np.ndarray, time:np.ndarray=None, Vm:np.ndarray=None, subgroup:str=None) -> None:
+        run_data = self.require_group(self.data, run_tag+str(run_id))
+        if subgroup is not None:
+            target = self.require_group(run_data, subgroup)
+        else:
+            target = run_data
         
-        self.create_array(run_data, senders_tag, senders.astype(np.int16))
-        self.create_array(run_data, spikes_tag, spikes.astype(np.float32))
+        self.create_array(target, senders_tag, senders.astype(np.int16))
+        self.create_array(target, spikes_tag, spikes.astype(np.float32))
         
-        self.create_array(run_data, time_tag, time)
-        self.create_array(run_data, Vm_tag, Vm.astype(np.float32))
+        if time is not None and Vm is not None:
+            self.create_array(target, time_tag, time)
+            self.create_array(target, Vm_tag, Vm.astype(np.float32))
         self.flush()
+              
         
-    
     def has_entropy(self, run_id:int) -> bool:
         rows = self.filter_rows(self.run, **{id_tag: run_id})
         if len(rows) != 1:
@@ -191,6 +200,39 @@ class ResponseHdf5(tb.File):
         for row in self.run.where(f"{id_tag} == {run_id}"):
             row["pre_entropy"] = pre_entropy
             row.update()
+            
+            
+    def has_Vdistribution(self, run_id:int) -> None:
+        run = self.get_node(self.data, f"run{run_id}")
+        if dist_pre_tag in run and dist_post_tag in run:
+            return True
+        return False
+    
+    
+    def add_Vdistribution(self, run_id:int, dist_pre:np.ndarray, dist_post:np.ndarray) -> None:
+        """
+        Adds the entropy of the membrane potentials to the file.
+        
+        :param run_id: Run ID.
+        :type run_id:int 
+        :param dist_pre: Distribution of membrane potentials before the change
+        :type dist_pre:np.ndarray
+        :param dist_post: Distribution of membrane potentials after the change
+        :type dist_post:np.ndarray
+        """
+        run = self.get_node(self.data, f"run{run_id}")
+        if dist_pre_tag in run:
+            self.remove_node(run, dist_pre_tag, recursive=True)
+            self.create_array(run, dist_pre_tag, dist_pre.astype(np.float32))
+        else:
+            self.create_array(run, dist_pre_tag, dist_pre.astype(np.float32))
+        
+        if dist_post_tag in run:
+            self.remove_node(run, dist_post_tag, recursive=True)
+            self.create_array(run, dist_post_tag, dist_post.astype(np.float32))
+        else:
+            self.create_array(run, dist_post_tag, dist_post.astype(np.float32))
+        self.flush()
 
 
     def has_spikes_by_sender(self, run_id:int) -> bool:
@@ -225,6 +267,41 @@ class Run(tb.IsDescription):
 #===============================================================================
 # METHODS
 #===============================================================================
+ 
+def load_and_merge_spikes(hfile:object, run_ids:np.ndarray, t_bins:np.ndarray, subgroup:str=None) -> np.ndarray:  
+    """
+    Pools and histograms the spikes of the selected run ids.
+    Discards the last histogram interval as it has different behavior than remaining intervals (cf. numpy docs).
+    
+    :param hfile: hdf5file-object.
+    :type hfile: object
+    :param run_ids: The ids for which the spikes are merged.
+    :type run_ids: np.ndarray
+    :param t_bins: time bins passed on to np.histogram
+    :type t_bins: np.ndarray
+    """
+    spikecounts_all_runs = []
+    for run_id in run_ids:
+        target = hfile.get_node(hfile.data, f"run{run_id}")
+        if subgroup is not None:
+            target = target[subgroup]
+        spike_times = target.spikes.read()
+        # Mask all spikes that are on the edge of the last interval (cf. https://numpy.org/doc/stable/reference/generated/numpy.histogram.html)
+        mask = spike_times >= t_bins[-1]
+        spikecounts, _ = np.histogram(spike_times[~mask], bins=t_bins)
+        spikecounts_all_runs.append(spikecounts)
+    return np.asarray(spikecounts_all_runs)
+
+
+def get_spikes_by_sender(spikes:np.ndarray, senders:np.ndarray, N:int) -> dict:
+    spikes_per_sender = np.empty(N, dtype=object)
+    # Initialize all sender with zeros (in case not all neurons fire)
+    for i in range(N):
+        spikes_per_sender[i] = np.zeros(0)
+    for i, s in enumerate(set(senders)):
+        spikes_per_sender[i] = spikes[senders == s]
+    return spikes_per_sender
+
 
 def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
     # Added in v0.1

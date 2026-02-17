@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Summary: Utility methods
+
+Methods can be used across projects.
 """
 #===============================================================================
 # PROGRAM METADATA

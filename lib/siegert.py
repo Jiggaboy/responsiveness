@@ -1,17 +1,88 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on 2021-12-10
+#===============================================================================
+# PROGRAM METADATA
+#===============================================================================
+__author__ = 'Hauke Wernecke'
+__contact__ = 'hower@kth.se'
+__version__ = '0.2'
 
-@author: Hauke Wernecke
-"""
+
+#===============================================================================
+# IMPORT STATEMENTS
+#===============================================================================
 
 from collections.abc import Iterable
 from functools import partial
 import numpy as np
 from scipy import integrate, special
+from scipy.optimize import root_scalar
+
+import lib.nest_interface as nif
+
+#===============================================================================
+# METHODS - HIGH LEVEL
+#===============================================================================
+
+def find_parameter(value:float, target_FR:float, dt:float, given_parameter:str="mean", low:float=1., high:float=10_000.):
+    "Value is in the generator space"
+    if given_parameter not in ("mean", "std"):
+        raise ValueError
+    if given_parameter == "mean":
+        search = "std"
+    else:
+        search = "mean"
+    kwargs = {given_parameter: value, "dt": dt}
+    
+    loaded = partial(FR_from_siegert, **kwargs)
+    def objective(param):
+        return loaded(**{search: param}) - target_FR
+    return root_scalar(objective, bracket=[low, high])
 
 
+def FR_from_siegert(mean:float, std:float, dt:float)->float:
+    """
+    Requires nest_interface for default values of the neurons.
+
+    Parameters
+    ----------
+    mean : float
+        Value of the Noise Generator (nest).
+    std : float
+        Value of the Noise Generator (nest).
+    dt : float
+        Time step of the Noise Generator, default is 10*dt of the simulation (nest: https://nest-simulator.readthedocs.io/en/stable/models/noise_generator.html).
+
+    Returns
+    -------
+    float
+        Predicted FR.
+
+    """
+    mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt)
+    return siegert(mean_tmp, np.sqrt(var_tmp), tau_ref=nif.t_ref*1e-3, tau_m=nif.tau*1e-3, threshold=nif.V_th*1e-3)
+
+
+def find_parameter_new(value:float, target_FR:float, dt:float, given_parameter:str="mu", low:float=1e-6, high:float=100_000.):
+    # Given parameter must be in the args list of siegert.
+    # Values here are from the free membrane potential
+    # sigma is with the factor 2 already (cf. Tsodyks 1991)
+    if given_parameter not in ("mu", "sigma"):
+        raise ValueError
+    if given_parameter == "mu":
+        search = "sigma"
+    else:
+        search = "mu"
+    kwargs = {given_parameter: value, "dt": dt, "tau_m": nif.tau*1e-3, "tau_ref": nif.t_ref*1e-3, "threshold": nif.V_th*1e-3}
+    
+    loaded = partial(siegert, **kwargs)
+    def objective(param):
+        return loaded(**{search: param}) - target_FR
+    return root_scalar(objective, bracket=[low, high])
+
+#===============================================================================
+# METHODS - LOW LEVEL
+#===============================================================================
 def error_integral(mu:float, sigma:float, threshold:float, reset_potential:float=0., **kwargs):
     # Instead of the normal error function, we use the scaled complementary error function to avoid arithmetic underflow.
     lower_bound = (reset_potential - mu) / sigma
@@ -62,12 +133,24 @@ def potential_from_moments(GWN_mean_pA:np.ndarray, GWN_variance_pA:np.ndarray, t
     Takes the moments of a current source and
     calculates the mean and variance of the free membrane potential.
     Immediate transformation to the values one can plug-in into the Siegert formula.
+    See: https://nest-simulator.readthedocs.io/en/stable/models/noise_generator.html
+    Note: The factor 2 is missing as the siegert equation takes 2*var (cf. Tsodys 1991)
     """
     mean_potential = GWN_mean_pA * tau_ms / membrane_capacitance * syn_weight
     # Units: 1e-12 * 1e-3 / 1e-12 = 1e-3
     mean_potential *= 1e-3
 
-    var_potential = dt * tau_ms * GWN_variance_pA / membrane_capacitance**2 * syn_weight**2
+    # Free membrane potential
+    var_potential = dt * tau_ms * GWN_variance_pA / membrane_capacitance**2 * syn_weight**2 / 2
     # Units: 1e-3 * 1e-3 1e-24 / 1e-24= 1e-6
     var_potential *= 1e-6
-    return mean_potential, var_potential
+    return mean_potential, 2*var_potential # as it is used for the siegert formula
+
+
+
+def get_drive_moments(tau_ms:float, syn_weight:float, C:int, FR:float):
+    """See Brunel 2000: Eq. 20(?)"""
+    mean = tau_ms*1e-3 * C * (syn_weight*1e-3)    * FR
+    var  = tau_ms*1e-3 * C * (syn_weight*1e-3)**2 * FR
+    return mean, var
+

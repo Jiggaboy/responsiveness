@@ -19,23 +19,23 @@ __version__ = '0.2'
 #===============================================================================
 from cflogger import logger
 
-from functools import partial
+
 import nest
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as  mpatches
 import pandas as pd
 from scipy.stats import entropy
-from scipy.optimize import root_scalar
 import seaborn as sns
 
 
 import lib.nest_interface as nif
 from lib.nest_interface import Generator
-from lib.responsehdf5 import ResponseHdf5, id_tag
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
 
 from lib import siegert
 from lib.util import pairwise, save_figure
+from lib.analysis import get_transient
 
 
 #===============================================================================
@@ -45,6 +45,11 @@ test = True
 test = False
 force= True
 force= False
+
+double_step = True
+double_step = False
+double_change = True
+# double_change = False
 
 if test:
     N               = 100
@@ -59,9 +64,15 @@ else:
     warmup          = 100.
     duration_pre    = 400.
     duration_post   = 1000.
-    filename        = "sim_data.hdf5"
-    # duration_post   = 500.
-    # filename        = "shortsim_sim_data.hdf5"
+    delta_step      = nif.tau
+    if double_step and not double_change:
+        filename        = "double_step.hdf5"
+    elif double_change and not double_step:
+        filename        = "double_change.hdf5"
+    elif double_change and double_step:
+        filename        = "double_step_change.hdf5"
+    else:
+        raise ValueError("Invalid arguments")
     
     
 hist_binwidth = 2.5 #ms
@@ -70,6 +81,7 @@ metadata = {"N": N, "dt": dt, "warmup": warmup, "duration_pre": duration_pre, "d
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
+    
 
 def main():
     pre_FR = 2.
@@ -79,8 +91,8 @@ def main():
     # pre_FR = 4.
     # # post_FR = 6.
     # post_FR = 12.
-    pre_FR = 4.
-    post_FR = 2.
+    # pre_FR = 4.
+    # post_FR = 2.
     means = np.arange(240, 320+1, 20.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
@@ -93,35 +105,65 @@ def main():
         #===============================================================================
         # SIMULATION
         #===============================================================================
-        
-        for delta in ("mean", "std"):
-            for mean in means:
-                pre_mean = mean 
-                pre_std = round(find_parameter(mean, target_FR=pre_FR).root, 2)
-                
-                
-                if delta == "mean":
-                    post_mean = round(find_parameter(pre_std, target_FR=post_FR, given_parameter="std").root, 2) # ie delta mean
-                    post_std = pre_std
-                elif delta == "std":
-                    post_mean = mean
-                    post_std = round(find_parameter(mean, target_FR=post_FR).root, 2) # ie delta std
-                else:
-                    raise ValueError("No valid delta chosen")
+        pre_means = np.zeros(len(means))
+        post_means = np.zeros(len(means))
+        pre_stds = np.zeros(len(means))
+        post_stds = np.zeros(len(means))
+        if not double_change:
+            for delta in ("mean", "std"):
+                for m, mean in enumerate(means):
+                    pre_means[m] = mean
+                    pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=dt).root, 2)
+                    pre_stds[m] = pre_std
                     
+                    if delta == "mean":
+                        post_means[m] = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=dt, given_parameter="std").root, 2) # ie delta mean
+                        post_stds[m] = pre_std
+                    elif delta == "std":
+                        post_means[m] = mean
+                        post_stds[m] = round(siegert.find_parameter(mean, target_FR=post_FR, dt=dt).root, 2) # ie delta std
+                    else:
+                        raise ValueError("No valid delta chosen")
+                        
+                for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
+                    for seed in seeds:
+                        if not force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
+                                                               pre_mean=pre_mean, post_mean=post_mean,
+                                                               pre_std=pre_std, post_std=post_std, seed=seed)):
+                            logger.info("Skip simulation...")
+                            continue
+                        logger.info("Run simulation...")
+                        senders, spike_times, time, Vm = simulate(pre_mean, pre_std, post_mean, post_std, dt, seed=seed)
+                        
+                        logger.info("Save simulation...")
+                        run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
+                        hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
+        elif double_change:
+            for m, mean in enumerate(means):
+                pre_means[m] = mean
+                pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=dt).root, 2)
+                pre_stds[m] = pre_std
+                post_std = round(siegert.find_parameter(mean, target_FR=post_FR, dt=dt).root, 2)
+                post_stds[m] = pre_std + (post_std - pre_std) / 2
+                post_mean  = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=dt, given_parameter="std").root, 2)
+                post_means[m] = mean + (post_mean - mean) / 2
+        else:
+            raise ValueError("No parameter defined")  
+                 
+        for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
+            for seed in seeds:
+                if not force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
+                                                       pre_mean=pre_mean, post_mean=post_mean,
+                                                       pre_std=pre_std, post_std=post_std, seed=seed)):
+                    logger.info("Skip simulation...")
+                    continue
+                logger.info("Run simulation...")
+                senders, spike_times, time, Vm = simulate(pre_mean, pre_std, post_mean, post_std, dt, seed=seed)
                 
-                for seed in seeds:
-                    if not force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
-                                                           pre_mean=pre_mean, post_mean=post_mean,
-                                                           pre_std=pre_std, post_std=post_std, seed=seed)):
-                        logger.info("Skip simulation...")
-                        continue
-                    logger.info("Run simulation...")
-                    senders, spike_times, time, Vm = simulate(pre_mean, pre_std, post_mean, post_std, dt, seed=seed)
-                    
-                    logger.info("Save simulation...")
-                    run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
-                    hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
+                logger.info("Save simulation...")
+                run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
+                hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
+
                        
         #===============================================================================
         # POST-PROCESSING
@@ -130,7 +172,7 @@ def main():
         run_ids = rows[id_tag]
         for run_id in run_ids:
             # Add entropy (if not already there)
-            if not hfile.has_entropy(run_id):
+            if not hfile.has_entropy(run_id) or not hfile.has_Vdistribution(run_id):
                 Vm_bins = np.arange(nif.V_reset-5, nif.V_th+1, 1)
                 Vm = hfile.get_node(hfile.data, f"run{run_id}").Vm.read()
                 time = hfile.get_node(hfile.data, f"run{run_id}").time.read()
@@ -139,7 +181,13 @@ def main():
                 dist, _ = np.histogram(Vm[:, mask].ravel(), bins=Vm_bins)
                 pre_entropy = entropy(dist, nan_policy="raise")
                 
-                hfile.add_entropy(run_id, pre_entropy)
+                hfile.add_entropy(run_id, pre_entropy)               
+                
+                logger.info("Update dist")
+                buffer = 0.2 * duration_post
+                mask_post = np.logical_and(time >= warmup+duration_pre+buffer, time < warmup+duration_pre++duration_post)
+                dist_post, _ = np.histogram(Vm[:, mask].ravel(), bins=Vm_bins)
+                hfile.add_Vdistribution(run_id, dist, dist_post)
                 
                 
             if not hfile.has_spikes_by_sender(run_id):
@@ -165,21 +213,29 @@ def main():
         # DELAY - time bins
         t_bins = np.arange(0., duration_pre+duration_post+hist_binwidth, float(hist_binwidth)) + warmup
         
-        for tag in ("mean", "std"):
+        iterator = ("mean", "std") if not double_change else ("None", )
+        for tag in iterator:
             all_pre_entropy_estimates = np.zeros((len(means), B))
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]]  
+                if double_change:
+                    rows_filtered = rows
+                else:
+                    rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]]  
                 run_ids = rows_filtered[id_tag]
                 
-                figname = f"Spikecount with fixed {tag} (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
+                figname = f"Double-Step with fixed {tag} (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
                 fig, ax1 = plt.subplots(num=figname)
                 plt.xlabel("time [ms]")
                 plt.ylabel("FR [Hz]")
                 plt.axvline(warmup+duration_pre, color="red", zorder=10, ls="--")
                 plt.xlim(warmup+duration_pre - 10, warmup+duration_pre + 125)
-                plt.xticks(list(plt.xticks()[0]) + [warmup+duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
+                if double_step:
+                    plt.axvline(warmup+duration_pre+delta_step, color="red", zorder=10, ls="--")
+                    plt.xticks(list(plt.xticks()[0]) + [warmup+duration_pre, warmup+duration_pre+delta_step], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+                else:
+                    plt.xticks(list(plt.xticks()[0]) + [warmup+duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
 
                 entropies_pre   = np.zeros(B)
                 delay_estimates = np.zeros(B)
@@ -239,113 +295,6 @@ def main():
                 all_pre_entropy_estimates[m]  = entropies_pre
             all_pre_entropy_estimates = all_pre_entropy_estimates.T
                 
-            figname_preentropy = f"preentropy (FR: {pre_FR} to {post_FR})"
-            fig = plt.figure(figname_preentropy)
-            color = "tab:blue" if tag == "mean" else "tab:orange"
-            params = {
-                "levels": 4, 
-                "fill": False, 
-                "color": color,
-            }
-            for m, mean in enumerate(means):
-                delays_tmp = all_delay_estimates.delay[(all_delay_estimates["mean"]==mean) & (all_delay_estimates["tag"]==tag)]
-                sns.kdeplot(x=all_pre_entropy_estimates[:, m], y=delays_tmp, **params)
-                # sns.kdeplot(x=all_pre_entropy_estimates[:, m], y=all_delay_estimates[:, m], **params, label= f"is fixed")
-            handles = [mpatches.Patch(facecolor="tab:blue", label=r"$\Delta \, \sigma$"),
-                       mpatches.Patch(facecolor="tab:orange", label=r"$\Delta \, \mu$")]
-            plt.xlabel("entropy [nats]")
-            plt.ylabel("delay [ms]")
-            plt.ylim(0, 80)
-            plt.legend(handles=handles)
-            
-            
-        
-        ##### FIGURE -  TRANSIENT ESTIMATES ######################################
-        # figname = f"Delay estimates (FR: {pre_FR} to {post_FR})"
-        # fig = plt.figure(figname)
-        # plt.xticks(ticks=np.arange(len(means)), labels=means)
-        # sns.violinplot(all_delay_estimates, x="mean", y="delay", hue="tag", cut=0, density_norm="width", common_norm=True)
-        # # sns.violinplot(data=all_delay_estimates, cut=0, color=color)
-        # # sns.stripplot(data=all_delay_estimates, color="black", size=4, jitter=True, alpha=0.5)
-        # plt.xlabel(r"mean drive $\mu_{pre}$")
-        # plt.ylabel("delay [ms]")
-        # plt.ylim(0, 80)
-        # handles = [mpatches.Patch(facecolor="tab:blue", label=r"$\Delta \, \sigma$"),
-        #            mpatches.Patch(facecolor="tab:orange", label=r"$\Delta \, \mu$")]
-        # plt.legend(handles=handles)
-        # save_figure(figname, fig)
-            
-
-
-                
-        ##### FIGURE -  TIME TO FIRST SPIKE ######################################
-        # df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
-        #
-        # for tag in ("mean", "std"):
-        #     for m, mean in enumerate(means):
-        #         rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-        #         rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]]  
-        #         run_ids = rows_filtered[id_tag]
-        #
-        #         first_spike = []
-        #         for run_id in run_ids:
-        #             spikes_by_sender = hfile.get_node(hfile.data, f"run{run_id}").spikes_by_sender.read()
-        #             for spikes in spikes_by_sender:
-        #                 spikes_tmp = spikes[spikes >= warmup+duration_pre]
-        #                 if len(spikes_tmp) > 0:
-        #                     first_spike.append(spikes_tmp[0])
-        #         new_rows = pd.DataFrame({
-        #             "firstspike": np.asarray(first_spike)-warmup-duration_pre,
-        #             "tag": [tag] * len(first_spike),
-        #             "mean": [mean] * len(first_spike)
-        #         })
-        #         df = pd.concat([df, new_rows], ignore_index=True)
-        #
-        # figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR})"
-        # fig = plt.figure(figname_spike)
-        # sns.violinplot(df, x="mean", y="firstspike", hue="tag")
-        # plt.xlabel(r"mean drive $\mu_{pre}$")
-        # plt.ylabel("delay [ms]")
-        # # plt.xticks(plt.xticks()[0], plt.xticks()[1])
-        # handles = [mpatches.Patch(facecolor="tab:blue", label=r"$\Delta \, \sigma$"),
-        #            mpatches.Patch(facecolor="tab:orange", label=r"$\Delta \, \mu$")]
-        # plt.legend(handles=handles)
-        # save_figure(figname_spike, fig)
-
-
-                
-def load_and_merge_spikes(hfile:object, run_ids:np.ndarray, t_bins:np.ndarray) -> np.ndarray:  
-    """
-    Pools and histograms the spikes of the selected run ids.
-    Discards the last histogram interval as it has different behavior than remaining intervals (cf. numpy docs).
-    
-    :param hfile: hdf5file-object.
-    :type hfile: object
-    :param run_ids: The ids for which the spikes are merged.
-    :type run_ids: np.ndarray
-    :param t_bins: time bins passed on to np.histogram
-    :type t_bins: np.ndarray
-    """
-    spikecounts_all_runs = []
-    for run_id in run_ids:
-        spike_times = hfile.get_node(hfile.data, f"run{run_id}").spikes.read()
-        # Mask all spikes that are on the edge of the last interval (cf. https://numpy.org/doc/stable/reference/generated/numpy.histogram.html)
-        mask = spike_times >= t_bins[-1]
-        spikecounts, _ = np.histogram(spike_times[~mask], bins=t_bins)
-        spikecounts_all_runs.append(spikecounts)
-    return np.asarray(spikecounts_all_runs)
-
-        
-def get_spikes_by_sender(spikes:np.ndarray, senders:np.ndarray, N:int) -> dict:
-    spikes_per_sender = np.empty(N, dtype=object)
-    # Initialize all sender with zeros (in case not all neurons fire)
-    for i in range(N):
-        spikes_per_sender[i] = np.zeros(0)
-    for i, s in enumerate(set(senders)):
-        spikes_per_sender[i] = spikes[senders == s]
-    return spikes_per_sender
-
-
 
 def simulate(pre_mean:float, pre_std:float, post_mean:float, post_std:float, dt:float, seed:None) -> tuple:
     logger.info("Reset Nest kernel...")
@@ -362,7 +311,8 @@ def simulate(pre_mean:float, pre_std:float, post_mean:float, post_std:float, dt:
 
     logger.info("Create Network...")
     neurons = nif.create_LIF(N)
-    voltmeter, spike_detector = nif.create_detectors(warmup)
+    voltmeter = nif.create_voltmeter(warmup)
+    spike_detector = nif.create_spike_detector()
     nif.measure_neuron(neurons, voltmeter, spike_detector)
 
     logger.info("Stimulate Neurons...")
@@ -378,118 +328,31 @@ def simulate(pre_mean:float, pre_std:float, post_mean:float, post_std:float, dt:
     logger.info("Change generator settings...")
     generator.mean = post_mean
     generator.std = post_std
-    logger.info("Stimulate after changing the input...")
-    nest.Simulate(duration_post)
+    
+    logger.info("Stimulate after changing the input...")    
+    if double_step:
+        logger.info("Stimulate after changing the input...")
+        nest.Simulate(delta_step)
+        logger.info("Change generator settings...")
+        generator.mean = pre_mean
+        generator.std = pre_std
+        nest.Simulate(duration_post-delta_step)
+    else:
+        nest.Simulate(duration_post)
+        
 
     logger.info("Collect Spikes...")
     senders, spike_times = nif.collect_spikes(spike_detector).values()
     mask = np.logical_and(spike_times >= warmup, spike_times < duration_pre+warmup)
-    logger.info(f"FR pre: {FR_from_spikecount(np.count_nonzero(mask), N, duration_pre)}")
+    logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), N, duration_pre)}")
     mask = np.logical_and(spike_times >= duration_pre+warmup, spike_times < duration_pre+duration_post+warmup)
-    logger.info(f"FR post: {FR_from_spikecount(np.count_nonzero(mask), N, duration_post)}")
+    logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), N, duration_post)}")
 
     # return senders, spike_times, None, None
 
     logger.info("Get free Vm")
     time, Vm = nif.collect_Vm(voltmeter)
     return senders, spike_times, time, Vm
-
-
-def FR_from_spikecount(spikecount:int, N:int, time:float):
-    return spikecount / N / (time*1e-3)
-
-
-def find_parameter(value:float, target_FR:float, given_parameter:str="mean", low:float=1., high:float=5000.):
-    if given_parameter not in ("mean", "std"):
-        raise ValueError
-    if given_parameter == "mean":
-        search = "std"
-    else:
-        search = "mean"
-    kwargs = {given_parameter: value}
-    
-    loaded = partial(FR_from_siegert, **kwargs)
-    def objective(param):
-        return loaded(**{search: param}) - target_FR
-    return root_scalar(objective, bracket=[low, high])
-
-
-def FR_from_siegert(mean:float, std:float, dt:float=dt)->float:
-    """
-    Requires nest_interface for default values of the neurons.
-
-    Parameters
-    ----------
-    mean : float
-        Value of the Noise Generator (nest).
-    std : float
-        Value of the Noise Generator (nest).
-    dt : float
-        Time step of the Noise Generator, default is 10*dt of the simulation (nest: https://nest-simulator.readthedocs.io/en/stable/models/noise_generator.html).
-
-    Returns
-    -------
-    float
-        Predicted FR.
-
-    """
-    mean_tmp, var_tmp = siegert.potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt)
-    return siegert.siegert(mean_tmp, np.sqrt(var_tmp), tau_ref=nif.t_ref*1e-3, tau_m=nif.tau*1e-3, threshold=nif.V_th*1e-3)
-
-#===============================================================================
-# STATISTICAL METHODS
-#===============================================================================
-
-def get_transient(data:np.ndarray, ddof:int=1, min_samples:int=10) -> int:
-    """
-    Discards the initial {d} samples and calculates the SEM for the {data}.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        1d-array.
-    ddof : int, optional
-        Degree of freedom for calculation of std. The default is 1.
-    min_samples : int, optional
-        Minimum number of samples to calculate the SEM from. Default is 10.
-
-    Returns
-    -------
-    SEM: np.ndarray: SEM for the data with {d} discarded samples
-    d: int: the index of the lowest SEM
-
-    """
-    l = data.size
-    prefactor = np.zeros(l - min_samples)
-    std = np.zeros(l - min_samples)
-    SEM = np.zeros(l - min_samples)
-    SEMsq = np.zeros(l - min_samples)
-    SEMsqrt = np.zeros(l - min_samples)
-    for d in np.arange(l - min_samples):
-        SEMsqrt[d] = np.sqrt(1 / (l - d)) * data[d:].std(ddof=ddof)
-        prefactor[d] = 1 / (l - d)
-        std[d] = data[d:].std(ddof=ddof)
-        SEMsq[d] = (1 / (l - d))**2 * data[d:].std(ddof=ddof)
-        SEM[d] = 1 / (l - d) * data[d:].std(ddof=ddof)
-    # plt.figure("SEM")
-    # plt.plot((SEM-SEM.min())/(SEM.max()-SEM.min()), label="SEM")
-    # plt.plot((SEMsqrt-SEMsqrt.min())/(SEMsqrt.max()-SEMsqrt.min()), label="sqrt(SEM)")
-    # plt.plot((SEMsq-SEMsq.min())/(SEMsq.max()-SEMsq.min()), label="SEM**2")
-    # plt.legend()
-    # plt.figure("std")
-    # plt.plot(std)
-    # plt.figure("1/...")
-    # plt.plot(prefactor, label="pref")
-    # plt.plot(np.diff(prefactor) / prefactor[:-1], label="diff(pref)")
-    # plt.plot(np.sqrt(prefactor), label="sqrt(pref)")
-    # plt.plot(np.diff(np.sqrt(prefactor)) / np.sqrt(prefactor)[:-1], label="diff(sqrt(pref))")
-    
-    
-    return SEMsqrt, np.argmin(SEM)
-
-#===============================================================================
-# METHODS
-#===============================================================================
 
 
 

@@ -13,7 +13,7 @@ Description:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.1a'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -29,12 +29,13 @@ import nest
 #===============================================================================
 # NEURON PARAMETER
 #===============================================================================
-neuron_model = "iaf_psc_alpha"
-tau = 15.      # ms
-t_ref = 2.     # ms
-E_L = 0.       # mV
-V_reset = 0.   # mV
-V_th = 20.     # mV
+neuron_model = "iaf_psc_delta"
+tau = 15.           # ms
+t_ref = 2.          # ms
+E_L = 0.            # mV
+V_reset = 0.        # mV
+V_th = 20.          # mV
+capacitance = 250.  # pF
 
 #===============================================================================
 # RECORDER PARAMETER
@@ -73,14 +74,14 @@ def create_LIF(N):
     return nest.Create(neuron_model, N, params=neuron_params)
 
 
-
-
-def create_detectors(start:float)->tuple:
+def create_voltmeter(start:float) -> object:
     Vm_params = {"interval": voltmeter_interval, "record_from": ["V_m"], "start":start}
-    voltmeter = nest.Create(Recorder.voltmeter, 1, params=Vm_params)
-
-    spike_detector = nest.Create(Recorder.spikemeter, 1)
-    return voltmeter, spike_detector
+    return nest.Create(Recorder.voltmeter, 1, params=Vm_params)
+    
+    
+    
+def create_spike_detector() -> object:
+    return nest.Create(Recorder.spikemeter, 1)
 
 
 def measure_neuron(neuron, voltmeter:list=None, spike_detector:list=None, start:float=0.):
@@ -138,3 +139,10 @@ def collect_Vm(voltmeter):
         Vm[s] = vm
 
     return time, Vm
+
+#===============================================================================
+# METHODS - UTIL SPIKE/VM
+#===============================================================================
+
+def FR_from_spikecount(spikecount:int, N:int, time:float):
+    return spikecount / N / (time*1e-3)
