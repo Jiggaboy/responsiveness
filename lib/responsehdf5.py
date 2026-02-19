@@ -21,7 +21,7 @@ import tables as tb
 import numpy as np
 
 from pathlib import PosixPath, Path
-
+from lib.util import yes_no
 
 #===============================================================================
 # CONSTANTS
@@ -308,11 +308,11 @@ def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
     return Path(directory).joinpath(filename)
 
 
-def yes_no(question:str, answer:bool=None) -> bool:
-    if answer is not None:
-        return answer
-    answer = input(question + " (y/n)")
-    return answer.lower().strip() == "y"
+# def yes_no(question:str, answer:bool=None) -> bool:
+#     if answer is not None:
+#         return answer
+#     answer = input(question + " (y/n)")
+#     return answer.lower().strip() == "y"
 #===============================================================================
 if __name__ == '__main__':
     main()

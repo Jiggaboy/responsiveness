@@ -8,8 +8,17 @@ Summary:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.1a'
 
+#===============================================================================
+# TAGS
+#===============================================================================
+mean_tag = "mean"
+std_tag = "std"
+mean_std_tag = "both"
+
+delay_tag = "delay"
+entropy_tag = "entropy"
 
 
 #===============================================================================
@@ -23,6 +32,6 @@ FIGURE_DIR = "figures"
 # FIGURE SUFFICES
 #===============================================================================
 
-ANIMATION_SUFFIX = ".gif"
+ANIMATION_SUFFIX = ".gif" # ".mp4"
 FIGURE_SUFFIX = ".svg"
 FIGURE_ALTERNATIVE_SUFFIX = ".png"

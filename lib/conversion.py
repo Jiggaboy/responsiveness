@@ -27,6 +27,10 @@ import lib.nest_interface as nif
 # METHODS
 #===============================================================================
 
+def spikecount_to_FR(spikecount:np.ndarray, N:int, binwidth:float):
+    """binwidth in [ms]"""
+    return spikecount / N / (binwidth*1e-3)
+
 
 def from_generator_to_free_Vm(mean_pA:float=None, var_pA:float=None, dt:float=None):
     """
