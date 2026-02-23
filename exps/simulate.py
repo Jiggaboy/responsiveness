@@ -34,7 +34,6 @@ from lib import siegert
 from lib.util import pairwise, save_figure
 from lib.analysis import get_transient
 
-from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm
 
 #===============================================================================
 # CONSTANTS
@@ -63,7 +62,7 @@ def main():
     # means = np.append(means, 320.)
     # rnd = np.random.RandomState()
     # seed = rnd.randint(0, 2**32-1)
-    seeds = np.arange(22, dtype=int)
+    seeds = np.arange(30, dtype=int)
 
     
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
@@ -94,20 +93,20 @@ def main():
                 else:
                     raise ValueError("No valid delta chosen")
 
-        # Run simulations
-        for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
-            for seed in seeds:
-                if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
-                                                       pre_mean=pre_mean, post_mean=post_mean,
-                                                       pre_std=pre_std, post_std=post_std, seed=seed)):
-                    logger.info("Skip simulation...")
-                    continue
-                logger.info("Run simulation...")
-                senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, params.dt, seed=seed)
-                
-                logger.info("Save simulation...")
-                run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
-                hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
+            # Run simulations
+            for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
+                for seed in seeds:
+                    if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
+                                                           pre_mean=pre_mean, post_mean=post_mean,
+                                                           pre_std=pre_std, post_std=post_std, seed=seed)):
+                        logger.info("Skip simulation...")
+                        continue
+                    logger.info("Run simulation...")
+                    senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, params.dt, seed=seed)
+                    
+                    logger.info("Save simulation...")
+                    run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
+                    hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
 
         #===============================================================================
         # POST-PROCESSING
@@ -179,11 +178,11 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     logger.info("Stimulate after changing the input...")    
     if control.double_step:
         logger.info("Stimulate after changing the input...")
-        nest.Simulate(delta_step)
+        nest.Simulate(params.delta_step)
         logger.info("Change generator settings...")
         generator.mean = pre_mean
         generator.std = pre_std
-        nest.Simulate(params.duration_post-delta_step)
+        nest.Simulate(params.duration_post-params.delta_step)
     else:
         nest.Simulate(params.duration_post)
         

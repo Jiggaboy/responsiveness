@@ -52,7 +52,7 @@ post_FR = 10.
 # post_FR = 12.
 # pre_FR = 4.
 # post_FR = 2.
-seeds = np.arange(10, dtype=int)
+seeds = np.arange(20, dtype=int)
 
 
 #===============================================================================

@@ -101,7 +101,7 @@ def main():
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                if tag in (mean_tag, std_tag): #ie tag == both
+                if tag in (mean_tag, std_tag):
                     rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
                 elif tag == mean_std_tag:
                     mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
@@ -140,7 +140,8 @@ def main():
         
                     # DELAY 
                     spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)
-                    index = (t_bins >= params.warmup + params.duration_pre).argmax() # Gets first value that is larger than duration_pre
+                    t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
+                    index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
 
                     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
                     delay_estimates[b] = delay * hist_binwidth
@@ -183,6 +184,7 @@ def main():
     # PLOT - FIRING RATE AND INDIVIDUAL DELAY ESTIMATES
     #=============================================================================== 
     if plot_rate_and_delays:
+        t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
         for m, mean in enumerate(means):
             figname = f"Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
             fig, ax1 = plt.subplots(num=figname)
@@ -211,7 +213,7 @@ def main():
         
                 # Delay Estimation across all runs
                 d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
-                ax1.axvline(d + params.warmup + params.duration_pre, c=color, lw=2, ls="--", zorder=15)
+                ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
         
                 # g: rows = sims, cols = points
                 mu = gb.mean(axis=0)
@@ -224,7 +226,7 @@ def main():
                 ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
         
                 delays = df_metrics.xs((tag, mean), level=("tag", "mean"))["delay"]
-                ax2.hist(delays + params.warmup + params.duration_pre, bins=t_bins, color=color, density=True, zorder=-4, rwidth=0.9, alpha=0.5)
+                ax2.hist(delays + t_start, bins=t_bins, color=color, density=True, zorder=-4, rwidth=0.9, alpha=0.5)
         
         
                 
@@ -237,7 +239,7 @@ def main():
                 std_latter = std[-std.size:].mean()
                 mu_latter = mu[-mu.size:].mean()
                 for (_, fr), delay in zip(gb.iterrows(), delays):
-                    index = (t_bins >= params.warmup + params.duration_pre + delay).argmax() # Gets first value that is larger than duration_pre
+                    index = (t_bins >= t_start + delay).argmax() # Gets first value that is larger than duration_pre
 
                     osc_over    = fr[:index] > (1.5*std_latter + mu_latter)
                     osc_first_over = osc_over.argmax() # Gets the first True value
@@ -251,15 +253,15 @@ def main():
                     
                     rgb += [overshoot, osc, undershoot]
                     
-                    print(fr)
-                    print(delay)
-                    print(std_latter)
-                    print(above)
+                    # print(fr)
+                    # print(delay)
+                    # print(std_latter)
+                    # print(above)
                     
                 rgb /= len(gb)
                 print(rgb)
-                ax1.scatter(params.warmup + params.duration_pre + delay, 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
-                ax1.text(params.warmup + params.duration_pre + delay, 10, Label[tag], va="bottom", ha="center")
+                ax1.scatter(t_start + delay, 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
+                ax1.text(t_start + delay, 10, Label[tag], va="bottom", ha="center")
                     
                     
         
