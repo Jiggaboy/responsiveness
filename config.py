@@ -34,9 +34,6 @@ class Control:
     
     double_step = True
     double_step = False
-    
-    # double_change = True
-    # # double_change = False
 
 
 #===============================================================================
@@ -51,20 +48,14 @@ class Params:
     duration_post: float  = 1000.
     delta_step: float     = nif.tau
     
+    poisson_filename = "poisson.hdf5"
+    
     def __post_init__(self):
         c = Control()
         if not c.double_step:
             self.filename        = "sim_data.hdf5"
         elif c.double_step:
             self.filename        = "double_step.hdf5"
-        # if not c.double_step and not c.double_change:
-        #     self.filename        = "sim_data.hdf5"
-        # elif c.double_step and not c.double_change:
-        #     self.filename        = "double_step.hdf5"
-        # elif c.double_change and not c.double_step:
-        #     self.filename        = "double_change.hdf5"
-        # elif c.double_change and c.double_step:
-        #     self.filename        = "double_step_change.hdf5"
         else:
             raise ValueError("Invalid arguments")
             

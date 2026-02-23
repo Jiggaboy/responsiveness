@@ -15,7 +15,6 @@ __version__ = '0.1'
 #===============================================================================
 from cflogger import logger
 
-
 import nest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,60 +25,16 @@ import seaborn as sns
 
 
 from constants import mean_tag, std_tag, mean_std_tag
-# from config import load_config
+from config import load_config
 import lib.nest_interface as nif
-# from lib.nest_interface import Generator
-# from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
+from lib.nest_interface import Generator
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
 
-# from lib import siegert
-# from lib.util import pairwise, save_figure
-# from lib.analysis import get_transient
+from lib import siegert
+from lib.util import pairwise, save_figure
+from lib.analysis import get_transient
 
-# from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm
-
-
-import sys
-print(sys.path)
-quit()
-#===============================================================================
-# CONTROL VARIABLES
-#===============================================================================
-# test = True
-# test = False
-# force= True
-# force= False
-#
-# double_step = True
-# double_step = False
-# delta_step  = nif.tau
-#
-# double_change = True
-# # double_change = False
-#
-# N               = 2500
-# dt              = 0.1
-# warmup          = 100.
-# duration_pre    = 400.
-# duration_post   = 1000.
-#
-#
-# if not double_step and not double_change:
-#     filename        = "sim_data.hdf5"
-# if double_step and not double_change:
-#     filename        = "double_step.hdf5"
-# elif double_change and not double_step:
-#     filename        = "double_change.hdf5"
-# elif double_change and double_step:
-#     filename        = "double_step_change.hdf5"
-# else:
-#     raise ValueError("Invalid arguments")
-#
-# if test:
-#     N             = 500  
-#     duration_pre  = 200.
-#     duration_post = 500.
-#     filename = "test_" + filename    
-#
+from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm
 
 #===============================================================================
 # CONSTANTS
@@ -120,16 +75,11 @@ def main():
         pre_stds = np.zeros(len(means))
         post_stds = np.zeros(len(means))
         for delta in (mean_tag, std_tag, mean_std_tag):
-        # if not control.double_change: # Most cases -> only mean or std is changed
-                # Gather all the combinations
             for m, mean in enumerate(means):
                 pre_means[m] = mean
                 pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=params.dt).root, 2)
                 pre_stds[m] = pre_std
-            # if delta in (mean_tag, std_tag): # ie single parameter is changed
-                # Find starting point
-                
-                # Set the parameter post change (based on what is changed)
+
                 if delta == mean_tag:
                     post_means[m] = round(siegert.find_parameter(pre_std, target_FR=post_FR, given_parameter=std_tag, dt=params.dt).root, 2) # ie delta mean
                     post_stds[m] = pre_std
@@ -143,20 +93,7 @@ def main():
                     post_means[m] = mean + (post_mean - mean) / 2
                 else:
                     raise ValueError("No valid delta chosen")
-        #         elif delta in (mean_std_tag, ):
-        # # elif control.double_change:
-        #     # for m, mean in enumerate(means):
-        #             # pre_means[m] = mean
-        #             # pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=params.dt).root, 2)
-        #             # pre_stds[m] = pre_std
-        #             post_std = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2)
-        #             post_stds[m] = pre_std + (post_std - pre_std) / 2
-        #             post_mean  = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=params.dt, given_parameter=std_tag).root, 2)
-        #             post_means[m] = mean + (post_mean - mean) / 2
-                   
-        # else:
-        #     raise ValueError(f"Parameter {control.double_change} not defined!") 
-        
+
         # Run simulations
         for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
             for seed in seeds:
@@ -260,7 +197,7 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
 
     # return senders, spike_times, None, None
 
-    logger.info("Get free Vm")
+    logger.info("Get free Vm...")
     time, Vm = nif.collect_Vm(voltmeter)
     return senders, spike_times, time, Vm
 
