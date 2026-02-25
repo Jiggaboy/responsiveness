@@ -41,28 +41,26 @@ from lib.analysis import get_transient
 # hist_binwidth = 2.5 #ms
 Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
 
+    
+pre_FR = 2.
+post_FR = 4.
+pre_FR = 5.
+post_FR = 10.
+# pre_FR = 4.
+# # post_FR = 6.
+# post_FR = 12.
+# pre_FR = 4.
+# post_FR = 2.
+means = np.arange(240, 320+1, 130.)
+# means = np.arange(240, 290+1, 10.)
+# means = np.append(means, 320.
+seeds = np.arange(50, dtype=int)
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
 def main():
     control, params = load_config()
-    
-    pre_FR = 2.
-    post_FR = 4.
-    pre_FR = 5.
-    post_FR = 10.
-    # pre_FR = 4.
-    # # post_FR = 6.
-    # post_FR = 12.
-    # pre_FR = 4.
-    # post_FR = 2.
-    means = np.arange(240, 320+1, 30.)
-    # means = np.arange(240, 290+1, 10.)
-    # means = np.append(means, 320.)
-    # rnd = np.random.RandomState()
-    # seed = rnd.randint(0, 2**32-1)
-    seeds = np.arange(30, dtype=int)
 
     
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
@@ -102,7 +100,7 @@ def main():
                         logger.info("Skip simulation...")
                         continue
                     logger.info("Run simulation...")
-                    senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, params.dt, seed=seed)
+                    senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, seed=seed)
                     
                     logger.info("Save simulation...")
                     run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
@@ -143,14 +141,15 @@ def main():
     logger.info("Finished...")           
 
 
-def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_mean:float, post_std:float, dt:float, seed:None) -> tuple:
+def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_mean:float, post_std:float, seed:None) -> tuple:
     logger.info("Reset Nest kernel...")
     nest.ResetKernel()
     rnd = np.random.RandomState()
     seed = seed if seed is not None else rnd.randint(0, 2**32-1)
+    # seed = rnd.randint(0, 2**32-1)
     logger.info(f"Seed: {seed}")
     nest.SetKernelStatus({
-        "resolution": dt,
+        "resolution": params.dt,
         "rng_seed": int(seed+1),
         "local_num_threads": 2,
     })
@@ -212,6 +211,7 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
 
 if __name__ == '__main__':
     main()
-    
+    from lib.util import play_beep
+    play_beep()
     plt.show()
     quit()

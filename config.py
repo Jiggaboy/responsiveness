@@ -33,7 +33,7 @@ class Control:
     force= False
     
     double_step = True
-    # double_step = False
+    double_step = False
 
 
 #===============================================================================
@@ -49,11 +49,13 @@ class Params:
     delta_step: float     = nif.tau
     
     poisson_filename = "poisson.hdf5"
+    network_filename = "network.hdf5"
     
     def __post_init__(self):
         c = Control()
         if not c.double_step:
             self.filename        = "sim_data.hdf5"
+            # self.filename        = "randomseeds_data.hdf5"
         elif c.double_step:
             self.filename        = "double_step.hdf5"
         else:

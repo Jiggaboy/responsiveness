@@ -127,3 +127,10 @@ def yes_no(question:str, answer:bool=None) -> bool:
         return answer
     answer = input(question + " (y/n)")
     return answer.lower().strip() == "y"
+
+
+def play_beep(repeat:int=3, pause:float=0.2):
+    import os
+    beep = lambda x: os.system(f"echo -n '\a'; sleep {pause};" * x)
+    beep(repeat)
+

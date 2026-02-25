@@ -60,10 +60,10 @@ plot_transient_estimates = False
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-hist_binwidth = 2.5 #ms
+hist_binwidth = 2. #ms
 
-bootstraps = 25     #50
-samples_per_strap = 10 #25
+bootstraps = 50     #50
+samples_per_strap = 20 #25
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -82,7 +82,7 @@ def main():
     # post_FR = 12.
     # pre_FR = 4.
     # post_FR = 2.
-    means = np.arange(240, 320+1, 30.)
+    means = np.arange(240, 320+1, 130.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
 
@@ -109,6 +109,8 @@ def main():
                 else:
                     raise ValueError("No valid tag given...")
                 run_ids = rows_filtered[id_tag]
+                # print(len(run_ids), np.sum(np.asarray(run_ids)))
+                # continue
                 
                 # DELAY ACROSS ALL RUNS
                 spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins)
