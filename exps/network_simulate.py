@@ -44,7 +44,6 @@ from config import load_config
 control, params = load_config(is_network=True)
 
 Imean_ext   = 280.
-Emean_ext   = 260.
 means = [260., ]
 
 hist_binwidth = 2.5 #ms
@@ -53,7 +52,7 @@ pre_FR = 5 # for E and I
 post_FR = 10
 FR_I = pre_FR
 
-seeds = np.arange(2, dtype=int)
+seeds = np.arange(50, dtype=int)
 #===============================================================================
 # MAIN METHOD
 #===============================================================================
@@ -74,8 +73,7 @@ def main():
         post_Imeans = np.zeros(len(means))
         pre_Istds = np.zeros(len(means))
         post_Istds = np.zeros(len(means))
-        for delta in (mean_tag, std_tag, ):
-        # for delta in (mean_tag, std_tag, mean_std_tag):
+        for delta in (mean_tag, std_tag, mean_std_tag):
             for m, mean in enumerate(means):
                 ### EXCITATION
                 ## PRE
@@ -85,9 +83,8 @@ def main():
                 Evar_int_pre  = from_free_Vm_to_generator(var_V=(EEvar_pre + EIvar_pre), dt=params.dt) # given in pA
     
                 # Total fluctuation level with network recurrency
-                Estd_pre_tmp = siegert.find_parameter(Emean_ext+Emean_int_pre, target_FR=pre_FR, dt=params.dt).root # Estd_tmp in Generator space/pA
+                Estd_pre_tmp = siegert.find_parameter(mean+Emean_int_pre, target_FR=pre_FR, dt=params.dt).root # Estd_tmp in Generator space/pA
     
-                # Emean_pre = Emean_ext
                 Estd_pre  = np.sqrt(Estd_pre_tmp**2 - Evar_int_pre) # recurrent network compensated
                 pre_Emeans[m] = mean
                 pre_Estds[m] = Estd_pre
@@ -107,13 +104,22 @@ def main():
                     post_Estds[m] = Estd_pre
                 elif delta == std_tag:
                     # Delta std - keeping the same ext. drive; update with new internal network effects
-                    Estd_post_tmp = siegert.find_parameter(Emean_ext+Emean_int_post, target_FR=post_FR, dt=params.dt).root # Estd_tmp in Generator space
+                    Estd_post_tmp = siegert.find_parameter(mean+Emean_int_post, target_FR=post_FR, dt=params.dt).root # Estd_tmp in Generator space
                     Estd_post  = np.sqrt(Estd_post_tmp**2 - Evar_int_post) # Remove updated internal network effects
 
                     post_Emeans[m] = mean
                     post_Estds[m] = Estd_post
-                elif delta == mean_std_tag:
-                    pass
+                elif delta == mean_std_tag:                    
+                    # Delta std - keeping the same ext. drive; update with new internal network effects
+                    Estd_post_tmp = siegert.find_parameter(mean+Emean_int_post, target_FR=post_FR, dt=params.dt).root # Estd_tmp in Generator space
+                    Estd_post  = np.sqrt(Estd_post_tmp**2 - Evar_int_post) # Remove updated internal network effects
+                    
+                    # Set the std post change to the pre + delta/2
+                    post_Estds[m] = pre_Estds[m] + (Estd_post - pre_Estds[m]) / 2
+                    
+                    # Update the post mean accordingly
+                    Emean_post_tmp = siegert.find_parameter(np.sqrt(post_Estds[m]**2 + Evar_int_post), target_FR=post_FR, given_parameter="std", dt=params.dt).root # Estd_tmp in Generator space
+                    post_Emeans[m] = Emean_post_tmp - Emean_int_post
                 else:
                     raise ValueError("No valid delta chosen")
 

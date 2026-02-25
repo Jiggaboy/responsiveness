@@ -52,9 +52,10 @@ post_FR = 10.
 # pre_FR = 4.
 # post_FR = 2.
 means = np.arange(240, 320+1, 130.)
+means = np.arange(260, 320+1, 130.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
-seeds = np.arange(50, dtype=int)
+seeds = np.arange(25, dtype=int)
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================

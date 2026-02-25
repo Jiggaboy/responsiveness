@@ -32,8 +32,7 @@ import seaborn as sns
 from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
 from config import load_config
 import lib.nest_interface as nif
-from lib.nest_interface import Generator
-from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, exc_tag, inh_tag
 
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
@@ -49,9 +48,6 @@ from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm,
 plot_rate_and_delays = True
 # plot_rate_and_delays = False
 
-plot_entropy_over_delay = True
-plot_entropy_over_delay = False
-
 plot_transient_estimates = True
 plot_transient_estimates = False
 
@@ -60,6 +56,19 @@ plot_transient_estimates = False
 #===============================================================================
 # CONSTANTS
 #===============================================================================
+
+pre_FR = 2.
+post_FR = 4.
+pre_FR = 5.
+post_FR = 10.
+# pre_FR = 4.
+# post_FR = 6.
+# post_FR = 12.
+# pre_FR = 4.
+# post_FR = 2.
+means = [260, ]
+    
+    
 hist_binwidth = 2. #ms
 
 bootstraps = 50     #50
@@ -68,31 +77,19 @@ samples_per_strap = 20 #25
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
-@functimer  # .6s per seed (25 straps x 10 samples)
+@functimer  
 def main():
-    control, params = load_config()
+    control, params = load_config(is_network=True)  
     t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
-    
-    pre_FR = 2.
-    post_FR = 4.
-    pre_FR = 5.
-    post_FR = 10.
-    # pre_FR = 4.
-    # post_FR = 6.
-    # post_FR = 12.
-    # pre_FR = 4.
-    # post_FR = 2.
-    means = np.arange(240, 320+1, 130.)
-    # means = np.arange(240, 290+1, 10.)
-    # means = np.append(means, 320.)
 
-    
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+
+    with ResponseHdf5(params.network_filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # MORE METHODS
         #===============================================================================    
         all_metrics = []
-        all_rates = []
+        Erates = []
+        Irates = []
         all_runs_delays = []
         
         
@@ -109,11 +106,9 @@ def main():
                 else:
                     raise ValueError("No valid tag given...")
                 run_ids = rows_filtered[id_tag]
-                # print(len(run_ids), np.sum(np.asarray(run_ids)))
-                # continue
                 
                 # DELAY ACROSS ALL RUNS
-                spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins)
+                spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins, subgroup=exc_tag)
                 index = (t_bins >= params.warmup+params.duration_pre).argmax() # Gets first value that is larger than duration_pre
         
                 _, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
@@ -130,35 +125,46 @@ def main():
                     [[tag], [mean], ["all"]],
                     names=["tag", "mean", "bootstrap_id"]
                 )
-                all_rates.append(new_rows)
+                Erates.append(new_rows)
+                
+                # INHIBITION: DELAY ACROSS ALL RUNS
+                spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins, subgroup=inh_tag)
+                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N // 4, hist_binwidth)
+                # Extend the array of firing rates
+                new_rows = pd.DataFrame([FR_all_runs])
+                new_rows.index = pd.MultiIndex.from_product(
+                    [[tag], [mean], ["all"]],
+                    names=["tag", "mean", "bootstrap_id"]
+                )
+                Irates.append(new_rows)
 
                 # Detailed feature analysis
-                entropies_pre   = np.zeros(bootstraps)
                 delay_estimates = np.zeros(bootstraps)
-                population_FR   = np.zeros((bootstraps, t_bins.size-1))
+                Epopulation_FR   = np.zeros((bootstraps, t_bins.size-1))
+                Ipopulation_FR   = np.zeros((bootstraps, t_bins.size-1))
                 for b in range(bootstraps):
                     np.random.shuffle(run_ids)
                     samples = run_ids[:samples_per_strap] # Bootstrapping
         
-                    # DELAY 
-                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)
                     t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
                     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
+                    
+                    # DELAY 
+                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=exc_tag)
 
                     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
                     delay_estimates[b] = delay * hist_binwidth
         
                     # FIRING RATE
                     FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
-                    population_FR[b] = FRs
-        
-                    # ENTROPY
-                    pre_entropies  = hfile.read_rows(samples)["pre_entropy"]
-                    entropies_pre[b] = pre_entropies.mean()
+                    Epopulation_FR[b] = FRs
                     
+                    # INHIBITORY FIRING RATE
+                    Ispikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=inh_tag)        
+                    FRs = spikecount_to_FR(Ispikecounts_all_runs.mean(axis=0), params.N // 4, hist_binwidth)
+                    Ipopulation_FR[b] = FRs
                     
                 new_rows = pd.DataFrame({
-                    entropy_tag: entropies_pre,
                     delay_tag: delay_estimates,
                 })
                 new_rows.index = pd.MultiIndex.from_product(
@@ -168,15 +174,24 @@ def main():
                 all_metrics.append(new_rows)
                 
                 # Extend the array of firing rates
-                new_rows = pd.DataFrame(population_FR)
+                new_rows = pd.DataFrame(Epopulation_FR)
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [mean], range(population_FR.shape[0])],
+                    [[tag], [mean], range(Epopulation_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
                 )
-                all_rates.append(new_rows)
+                Erates.append(new_rows)
+                
+                # Extend the array of firing rates
+                new_rows = pd.DataFrame(Ipopulation_FR)
+                new_rows.index = pd.MultiIndex.from_product(
+                    [[tag], [mean], range(Ipopulation_FR.shape[0])],
+                    names=["tag", "mean", "bootstrap_id"]
+                )
+                Irates.append(new_rows)
                 
                 
-        df_rates = pd.concat(all_rates)
+        df_Erates = pd.concat(Erates)
+        df_Irates = pd.concat(Irates)
         df_metrics = pd.concat(all_metrics)
         df_all_runs_delays = pd.concat(all_runs_delays)
         
@@ -188,7 +203,7 @@ def main():
     if plot_rate_and_delays:
         t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
         for m, mean in enumerate(means):
-            figname = f"Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
+            figname = f"Network: Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
             fig, ax1 = plt.subplots(num=figname)
             ax1.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
                     xlim=(params.warmup+params.duration_pre - 10, params.warmup+params.duration_pre + 125))
@@ -207,7 +222,7 @@ def main():
             bin_center = (t_bins[:-1] + t_bins[1:]) / 2
         
         
-            df = df_rates.xs(mean, level=("mean"))
+            df = df_Erates.xs(mean, level=("mean"))
             for tag, g in df.groupby(level="tag"):
                 gb = g[g.index.get_level_values("bootstrap_id") != "all"]
                 label = Label[tag]
@@ -229,74 +244,31 @@ def main():
         
                 delays = df_metrics.xs((tag, mean), level=("tag", "mean"))["delay"]
                 ax2.hist(delays + t_start, bins=t_bins, color=color, density=True, zorder=-4, rwidth=0.9, alpha=0.5)
+                
+            df = df_Irates.xs(mean, level=("mean"))
+            for tag, g in df.groupby(level="tag"):
+                gb = g[g.index.get_level_values("bootstrap_id") != "all"]
+                label = Label[tag]
+                color = Color[tag]
         
+                # g: rows = sims, cols = points
+                mu = gb.mean(axis=0)
+                std = gb.std(axis=0)
         
-                
-                rgb = np.asarray([0, 0, 0], dtype=float)
-                threshold = 8
-                
-                import itertools
-                consecutive_True = lambda condition: [ sum( 1 for _ in group ) for key, group in itertools.groupby( condition ) if key ]
-                
-                std_latter = std[-std.size:].mean()
-                mu_latter = mu[-mu.size:].mean()
-                for (_, fr), delay in zip(gb.iterrows(), delays):
-                    index = (t_bins >= t_start + delay).argmax() # Gets first value that is larger than duration_pre
-
-                    osc_over    = fr[:index] > (1.5*std_latter + mu_latter)
-                    osc_first_over = osc_over.argmax() # Gets the first True value
-                    osc_under   = fr[osc_first_over:index] < (1.5*std_latter + mu_latter)
-                    osc = True if np.count_nonzero(osc_first_over) > threshold and np.count_nonzero(osc_under) > threshold else False
-                    
-                    above = fr[:index] > (3*std_latter + mu_latter)
-                    overshoot = True if np.any(above) and np.max(consecutive_True(above)) > threshold else False
-                    
-                    undershoot = False if osc or overshoot else True
-                    
-                    rgb += [overshoot, osc, undershoot]
-                    
-                    # print(fr)
-                    # print(delay)
-                    # print(std_latter)
-                    # print(above)
-                    
-                rgb /= len(gb)
-                print(rgb)
-                ax1.scatter(t_start + delay, 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
-                ax1.text(t_start + delay, 10, Label[tag], va="bottom", ha="center")
+                ax1.plot(bin_center, mu, label=label, color=color, ls="dashed")
+                ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
+ 
+                ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dashdot", color=color)
                     
                     
         
             ax1.set_ylim(bottom=0) 
             ax1.legend()
         
-            save_figure(figname, fig)
-    
-    
-    #===============================================================================
-    # PLOT - ENTROPY OVER DELAY
-    #=============================================================================== 
-    if plot_entropy_over_delay:
-        figname_preentropy = f"preentropy (FR: {pre_FR} to {post_FR})"
-        fig, ax_entropy = plt.subplots(num=figname_preentropy)
-        ax_entropy.set(xlabel="Entropy [nats]", ylabel="Delay [ms]", ylim=(0, 80))
-        handles = []
-        for tag in (mean_tag, std_tag, mean_std_tag):
+            # save_figure(figname, fig)
 
-            label = Label[tag]
-            color = Color[tag]
-            handles.append((mpatches.Patch(facecolor=color, label=label)))
-            kwargs = {
-                "levels": 4, 
-                "fill": False, 
-                "color": color,
-            }
-            
-            for m, mean in enumerate(means):
-                metrics_tmp = df_metrics.xs((tag, mean), level=("tag", "mean"))
-                sns.kdeplot(x=metrics_tmp[entropy_tag], y=metrics_tmp[delay_tag], **kwargs, ax=ax_entropy)
-        ax_entropy.legend(handles=handles)
 
+    
 
     #===============================================================================
     # PLOT - TRANSIENT ESTIMATES
