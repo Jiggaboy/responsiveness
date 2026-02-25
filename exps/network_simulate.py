@@ -30,7 +30,7 @@ from lib.nest_interface import Generator
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, exc_tag, inh_tag
 
 from lib import siegert
-from lib.util import pairwise, save_figure, functimer
+from lib.util import pairwise, save_figure, functimer, h5path
 from lib.analysis import get_transient
 from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm
 from constants import mean_tag, std_tag, mean_std_tag
@@ -169,79 +169,25 @@ def main():
                     hfile.add_data_to_run(run_id, Esenders, Espike_times, subgroup=exc_tag)
                     hfile.add_data_to_run(run_id, Isenders, Ispike_times, subgroup=inh_tag)
         logger.info("Simulation finished...")
-    return
-    # Delta std - keeping the same ext. drive; update with new internal network effects
-    # Estd_post_tmp = siegert.find_parameter(Emean_ext+Emean_int_post, target_FR=post_FR, dt=dt).root # Estd_tmp in Generator space
-    # Emean_post = Emean_ext
-    # Estd_post  = np.sqrt(Estd_post_tmp**2 - Evar_int_post) # Remove updated internal network effects
-
-    # print("Delta std")
-    # print(f"Ext. Pre to post (mean): {Emean_pre} to {Emean_post}")
-    # print(f"Int. Pre to post (mean): {Emean_int_pre} to {Emean_int_post}")
-    # print(f"Ext. Pre to post (std): {Estd_pre} to {Estd_post}")
-    # print(f"Int. Pre to post (std): {np.sqrt(Evar_int_pre)} to {np.sqrt(Evar_int_post)}")
-    
-    # # Delta mean (Factor sqrt(2) required, cf Tsodyks 1991)
-    # Emean_post_tmp = siegert.find_parameter(np.sqrt(Estd_pre**2 + Evar_int_post), target_FR=post_FR, given_parameter="std", dt=dt).root # Estd_tmp in Generator space
-    # Emean_post = Emean_post_tmp - Emean_int_post
-    # Estd_post  = Estd_pre
-    
-    # print("Delta mean")
-    # print(f"Ext. Pre to post (mean): {Emean_pre} to {Emean_post}")
-    # print(f"Int. Pre to post (mean): {Emean_int_pre} to {Emean_int_post}")
-    # print(f"Ext. Pre to post (std): {Estd_pre} to {Estd_post}")
-    # print(f"Int. Pre to post (std): {Evar_int_pre} to {Evar_int_post}")
         
-    #
-    # IEmean_pre, IEvar_pre = siegert.get_drive_moments(nif.tau,    J, C_IE, pre_FR)
-    # IImean_pre, IIvar_pre = siegert.get_drive_moments(nif.tau, -g*J, C_II, FR_I)
-    # Imean_int_pre = from_free_Vm_to_generator(IEmean_pre + IImean_pre)              # given in pA
-    # Ivar_int_pre  = from_free_Vm_to_generator(var_V=(IEvar_pre + IIvar_pre), dt=dt) # given in pA
-    #
-    # Istd_pre_tmp = siegert.find_parameter(Imean_ext+Imean_int_pre, target_FR=FR_I, dt=dt).root
-    # Imean_pre = Imean_ext
-    # Istd_pre  = np.sqrt(Istd_pre_tmp**2 - Ivar_int_pre) # recurrent network compensated
-    #
-
-    #
-    # ## Post
-    # # Recurrent networks effects
-    #
-    # IEmean_post, IEvar_post = siegert.get_drive_moments(nif.tau,    J, C_IE, post_FR)   # these are the moments of the free Vm
-    # IImean_post, IIvar_post = siegert.get_drive_moments(nif.tau, -g*J, C_II, FR_I)      # free Vm
-    # Imean_int_post = from_free_Vm_to_generator(IEmean_post + IImean_post)               # given in pA
-    # Ivar_int_post  = from_free_Vm_to_generator(var_V=(IEvar_post + IIvar_post), dt=dt)  # given in pA
-    #
-    # # Delta std - Compensation for the increased exc. FR
-    # Istd_post_tmp = siegert.find_parameter(Imean_ext + Imean_int_post, target_FR=FR_I, dt=dt).root
-    # Imean_post = Imean_ext
-    # Istd_post  = np.sqrt(Istd_post_tmp**2 - Ivar_int_post)
-    #
-
-    
-    # print("Delta std (inh)")
-    # print(f"Ext. Pre to post (mean): {Imean_pre} to {Imean_post}")
-    # print(f"Int. Pre to post (mean): {Imean_int_pre} to {Imean_int_post}")
-    # print(f"Ext. Pre to post (std): {Istd_pre} to {Istd_post}")
-    # print(f"Int. Pre to post (std): {Ivar_int_pre} to {Ivar_int_post}")
-    
-    # # Delta mean - Compensation for the increased exc. FR
-    # Imean_post_tmp = siegert.find_parameter(np.sqrt(Istd_pre**2 + Ivar_int_post), target_FR=FR_I, given_parameter="std", dt=dt).root
-    # Imean_post = Imean_post_tmp - Imean_int_post
-    # Istd_post  = Istd_pre
-    #
-    #
-    # print("Delta mean (inh)")
-    # print(f"Ext. Pre to post (mean): {Imean_pre} to {Imean_post}")
-    # print(f"Int. Pre to post (mean): {Imean_int_pre} to {Imean_int_post}")
-    # print(f"Ext. Pre to post (std): {Istd_pre} to {Istd_post}")
-    # print(f"Int. Pre to post (std): {Ivar_int_pre} to {Ivar_int_post}")
-    
-
-    # (Esenders, Espike_times), (Isenders, Ispike_times), _ = simulate(pre_Emeans[m], pre_Estds[m], post_Emeans[m], post_Estds[m],
-    #                                                                  pre_Imeans[m], pre_Istds[m], post_Imeans[m], post_Istds[m],
-    #                                                                  dt=dt)
-    
+        #===============================================================================
+        # POST-PROCESSING
+        #===============================================================================
+        rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR)
+        run_ids = rows[id_tag] # id_tag is the tag for all runs
+        for run_id in run_ids:
+            for pop in (exc_tag, inh_tag):
+                if not hfile.has_spikes_by_sender(run_id, subgroup=pop):
+                    logger.info(f"Processing (run id: {run_id})...")
+                    target_group = hfile.get_node(h5path(hfile.data._v_pathname, f"run{run_id}", pop))
+                    spike_times = target_group.spikes.read()
+                    senders = target_group.senders.read()
+                    N = params.N if pop == exc_tag else (params.N // 4)
+                    spikes_by_sender = get_spikes_by_sender(spike_times, senders, N)
+                    hfile.add_spikes_by_sender(run_id, spikes_by_sender, subgroup=pop)
+            logger.info(f"Processing (run id: {run_id}) finished...")
+        logger.info("Processing finished...")
+    return    
     t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
         
     plt.figure()

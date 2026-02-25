@@ -239,15 +239,23 @@ class ResponseHdf5(tb.File):
         self.flush()
 
 
-    def has_spikes_by_sender(self, run_id:int) -> bool:
-        run = self.get_node(self.data, f"run{run_id}")
-        if spikes_by_sender_tag in run:
+    def has_spikes_by_sender(self, run_id:int, subgroup:str=None) -> bool:
+        run_data = self.require_group(self.data, run_tag+str(run_id))
+        if subgroup is not None:
+            target = self.require_group(run_data, subgroup)
+        else:
+            target = run_data
+        if spikes_by_sender_tag in target:
             return True
         return False
         
-    def add_spikes_by_sender(self, run_id, spikes_by_sender) -> None:
-        run = self.get_node(self.data, f"run{run_id}")
-        vlarray = self.create_vlarray(run, spikes_by_sender_tag, tb.Float32Atom())
+    def add_spikes_by_sender(self, run_id, spikes_by_sender, subgroup:str=None) -> None:
+        run_data = self.require_group(self.data, run_tag+str(run_id))
+        if subgroup is not None:
+            target = self.require_group(run_data, subgroup)
+        else:
+            target = run_data
+        vlarray = self.create_vlarray(target, spikes_by_sender_tag, tb.Float32Atom())
         for spikes in spikes_by_sender:
             vlarray.append(spikes)
         self.flush()
@@ -312,11 +320,6 @@ def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
     return Path(directory).joinpath(filename)
 
 
-# def yes_no(question:str, answer:bool=None) -> bool:
-#     if answer is not None:
-#         return answer
-#     answer = input(question + " (y/n)")
-#     return answer.lower().strip() == "y"
 #===============================================================================
 if __name__ == '__main__':
     main()

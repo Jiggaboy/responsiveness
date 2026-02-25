@@ -4,13 +4,16 @@
 Summary: Utility methods
 
 Methods can be used across projects.
+
+History:
+    v0.1a: h5path added.
 """
 #===============================================================================
 # PROGRAM METADATA
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.1a'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -20,6 +23,7 @@ from collections.abc import Iterable
 from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import PurePosixPath
 
 from functools import wraps, partial
 from time import perf_counter
@@ -80,7 +84,8 @@ def mkdir(filename:str) -> None:
     path = Path(filename)
     path.parent.absolute().mkdir(parents=True, exist_ok=True)
 
-
+def h5path(*parts):
+    return str(PurePosixPath(*parts))
 #===============================================================================
 # FIGURES
 #===============================================================================
