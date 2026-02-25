@@ -87,9 +87,13 @@ class ResponseHdf5(tb.File):
     def is_current_metadata(self, metadata:dict) -> bool:
         metadata_grp = self.require_group(self.root, metadata_tag)
         for key, value in metadata.items():
-            if not metadata_grp._v_attrs[key] == value:
-                logger.warning(f"Unequal attribute ({key}): {value}")
-                return False
+            try:
+                if not metadata_grp._v_attrs[key] == value:
+                    logger.warning(f"Unequal attribute ({key}): {value}")
+                    return False
+            except KeyError:
+                logger.warning(f"Attribute not in metadata ({key})...")
+                return False                
         return True
     
     

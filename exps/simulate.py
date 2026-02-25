@@ -8,7 +8,7 @@ Summary: A single population can be stimulated in various ways and the data is p
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.1a'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -142,6 +142,12 @@ def main():
 
 
 def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_mean:float, post_std:float, seed:None) -> tuple:
+    """
+    History:
+        - v0.1: Initital implementation.
+        - v0.1a: Remove dt as parameter (use params.dt instead).
+    """
+    
     logger.info("Reset Nest kernel...")
     nest.ResetKernel()
     rnd = np.random.RandomState()

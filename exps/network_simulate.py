@@ -41,23 +41,7 @@ from constants import mean_tag, std_tag, mean_std_tag
 #===============================================================================
 
 from config import load_config
-control, params = load_config()
-NE              = 10000
-NI              = 2500
-dt              = .05
-warmup          = 100.
-duration_pre    = 300.
-duration_post   = 600.
-filename        = "nettest.hdf5"
-
-J = syn_weight = 0.01
-g = 8.
-# Target-Source notation
-# Indegree definition
-C_EE = 100
-C_EI = 200
-C_IE = 200
-C_II = 100
+control, params = load_config(is_network=True)
 
 Imean_ext   = 280.
 Emean_ext   = 260.
@@ -74,6 +58,10 @@ seeds = np.arange(2, dtype=int)
 # MAIN METHOD
 #===============================================================================
 def main():
+    """
+    History:
+        - v0.1a: Refactor with params class.
+    """
     #===============================================================================
     # EXPERIMENT  - Simulation with delta for the E population
     #===============================================================================
@@ -91,13 +79,13 @@ def main():
             for m, mean in enumerate(means):
                 ### EXCITATION
                 ## PRE
-                EEmean_pre, EEvar_pre = siegert.get_drive_moments(nif.tau,    J, C_EE, pre_FR)  # these are the moments of the free Vm
-                EImean_pre, EIvar_pre = siegert.get_drive_moments(nif.tau, -g*J, C_EI, FR_I)    # free Vm
+                EEmean_pre, EEvar_pre = siegert.get_drive_moments(nif.tau,           params.J, params.C_EE, pre_FR)  # these are the moments of the free Vm
+                EImean_pre, EIvar_pre = siegert.get_drive_moments(nif.tau, -params.g*params.J, params.C_EI, FR_I)    # free Vm
                 Emean_int_pre = from_free_Vm_to_generator(EEmean_pre + EImean_pre)              # given in pA
-                Evar_int_pre  = from_free_Vm_to_generator(var_V=(EEvar_pre + EIvar_pre), dt=dt) # given in pA
+                Evar_int_pre  = from_free_Vm_to_generator(var_V=(EEvar_pre + EIvar_pre), dt=params.dt) # given in pA
     
                 # Total fluctuation level with network recurrency
-                Estd_pre_tmp = siegert.find_parameter(Emean_ext+Emean_int_pre, target_FR=pre_FR, dt=dt).root # Estd_tmp in Generator space/pA
+                Estd_pre_tmp = siegert.find_parameter(Emean_ext+Emean_int_pre, target_FR=pre_FR, dt=params.dt).root # Estd_tmp in Generator space/pA
     
                 # Emean_pre = Emean_ext
                 Estd_pre  = np.sqrt(Estd_pre_tmp**2 - Evar_int_pre) # recurrent network compensated
@@ -106,20 +94,20 @@ def main():
     
                 ## POST
                 # Recurrent network effects
-                EEmean_post, EEvar_post = siegert.get_drive_moments(nif.tau,    J, C_EE, post_FR) # these are the moments of the free Vm
-                EImean_post, EIvar_post = siegert.get_drive_moments(nif.tau, -g*J, C_EI, FR_I)
+                EEmean_post, EEvar_post = siegert.get_drive_moments(nif.tau,           params.J, params.C_EE, post_FR) # these are the moments of the free Vm
+                EImean_post, EIvar_post = siegert.get_drive_moments(nif.tau, -params.g*params.J, params.C_EI, FR_I)
                 Emean_int_post = from_free_Vm_to_generator(EEmean_post + EImean_post)              # given in pA
-                Evar_int_post  = from_free_Vm_to_generator(var_V=(EEvar_post + EIvar_post), dt=dt) # given in pA
+                Evar_int_post  = from_free_Vm_to_generator(var_V=(EEvar_post + EIvar_post), dt=params.dt) # given in pA
     
                 if delta == mean_tag:
                     # Delta mean (Factor sqrt(2) required, cf Tsodyks 1991)
-                    Emean_post_tmp = siegert.find_parameter(np.sqrt(Estd_pre**2 + Evar_int_post), target_FR=post_FR, given_parameter="std", dt=dt).root # Estd_tmp in Generator space
+                    Emean_post_tmp = siegert.find_parameter(np.sqrt(Estd_pre**2 + Evar_int_post), target_FR=post_FR, given_parameter="std", dt=params.dt).root # Estd_tmp in Generator space
 
                     post_Emeans[m] = Emean_post_tmp - Emean_int_post
                     post_Estds[m] = Estd_pre
                 elif delta == std_tag:
                     # Delta std - keeping the same ext. drive; update with new internal network effects
-                    Estd_post_tmp = siegert.find_parameter(Emean_ext+Emean_int_post, target_FR=post_FR, dt=dt).root # Estd_tmp in Generator space
+                    Estd_post_tmp = siegert.find_parameter(Emean_ext+Emean_int_post, target_FR=post_FR, dt=params.dt).root # Estd_tmp in Generator space
                     Estd_post  = np.sqrt(Estd_post_tmp**2 - Evar_int_post) # Remove updated internal network effects
 
                     post_Emeans[m] = mean
@@ -133,12 +121,12 @@ def main():
                 
                 ### INHIBITION
                 ## PRE
-                IEmean_pre, IEvar_pre = siegert.get_drive_moments(nif.tau,    J, C_IE, pre_FR)
-                IImean_pre, IIvar_pre = siegert.get_drive_moments(nif.tau, -g*J, C_II, FR_I)
+                IEmean_pre, IEvar_pre = siegert.get_drive_moments(nif.tau,           params.J, params.C_IE, pre_FR)
+                IImean_pre, IIvar_pre = siegert.get_drive_moments(nif.tau, -params.g*params.J, params.C_II, FR_I)
                 Imean_int_pre = from_free_Vm_to_generator(IEmean_pre + IImean_pre)              # given in pA
-                Ivar_int_pre  = from_free_Vm_to_generator(var_V=(IEvar_pre + IIvar_pre), dt=dt) # given in pA
+                Ivar_int_pre  = from_free_Vm_to_generator(var_V=(IEvar_pre + IIvar_pre), dt=params.dt) # given in pA
                 
-                Istd_pre_tmp = siegert.find_parameter(Imean_ext+Imean_int_pre, target_FR=FR_I, dt=dt).root
+                Istd_pre_tmp = siegert.find_parameter(Imean_ext+Imean_int_pre, target_FR=FR_I, dt=params.dt).root
                 pre_Imeans[m] = Imean_ext
                 pre_Istds[m]  = np.sqrt(Istd_pre_tmp**2 - Ivar_int_pre) # recurrent network compensated
     
@@ -146,10 +134,10 @@ def main():
                 ## POST
                 # Recurrent networks effects
                 
-                IEmean_post, IEvar_post = siegert.get_drive_moments(nif.tau,    J, C_IE, post_FR)   # these are the moments of the free Vm
-                IImean_post, IIvar_post = siegert.get_drive_moments(nif.tau, -g*J, C_II, FR_I)      # free Vm
+                IEmean_post, IEvar_post = siegert.get_drive_moments(nif.tau,           params.J, params.C_IE, post_FR)   # these are the moments of the free Vm
+                IImean_post, IIvar_post = siegert.get_drive_moments(nif.tau, -params.g*params.J, params.C_II, FR_I)      # free Vm
                 Imean_int_post = from_free_Vm_to_generator(IEmean_post + IImean_post)               # given in pA
-                Ivar_int_post  = from_free_Vm_to_generator(var_V=(IEvar_post + IIvar_post), dt=dt)  # given in pA
+                Ivar_int_post  = from_free_Vm_to_generator(var_V=(IEvar_post + IIvar_post), dt=params.dt)  # given in pA
                 
                 # # Delta std - Compensation for the increased exc. FR
                 # Istd_post_tmp = siegert.find_parameter(Imean_ext + Imean_int_post, target_FR=FR_I, dt=dt).root
@@ -157,7 +145,7 @@ def main():
                 # post_Istds[m]  = np.sqrt(Istd_post_tmp**2 - Ivar_int_post)
                 
                 # Delta mean - Compensation for the increased exc. FR
-                Imean_post_tmp = siegert.find_parameter(np.sqrt(pre_Istds[m]**2 + Ivar_int_post), target_FR=FR_I, given_parameter="std", dt=dt).root
+                Imean_post_tmp = siegert.find_parameter(np.sqrt(pre_Istds[m]**2 + Ivar_int_post), target_FR=FR_I, given_parameter="std", dt=params.dt).root
                 post_Imeans[m] = Imean_post_tmp - Imean_int_post
                 post_Istds[m]  = pre_Istds[m]
                 
@@ -169,18 +157,19 @@ def main():
                                                            pre_std=pre_Estds[m], post_std=post_Estds[m], seed=seed)):
                         logger.info("Skip simulation...")
                         continue
+                    
                     logger.info("Run simulation...")
-                    # senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, params.dt, seed=seed)
                     (Esenders, Espike_times), (Isenders, Ispike_times), _ = simulate(params, control,
                                                                  pre_Emeans[m], pre_Estds[m], post_Emeans[m], post_Estds[m],
                                                                  pre_Imeans[m], pre_Istds[m], post_Imeans[m], post_Istds[m],
-                                                                 dt=dt)
+                                                                 )
                         
                     logger.info("Save simulation...")
-                    run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
+                    run_id = hfile.add_run(pre_FR, post_FR, pre_Emeans[m], post_Emeans[m], pre_Estds[m], post_Estds[m], seed=seed)
                     hfile.add_data_to_run(run_id, Esenders, Espike_times, subgroup=exc_tag)
                     hfile.add_data_to_run(run_id, Isenders, Ispike_times, subgroup=inh_tag)
-                
+        logger.info("Simulation finished...")
+    return
     # Delta std - keeping the same ext. drive; update with new internal network effects
     # Estd_post_tmp = siegert.find_parameter(Emean_ext+Emean_int_post, target_FR=post_FR, dt=dt).root # Estd_tmp in Generator space
     # Emean_post = Emean_ext
@@ -253,7 +242,7 @@ def main():
     #                                                                  pre_Imeans[m], pre_Istds[m], post_Imeans[m], post_Istds[m],
     #                                                                  dt=dt)
     
-    t_bins = np.arange(0., duration_pre+duration_post+hist_binwidth, float(hist_binwidth)) + warmup
+    t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
         
     plt.figure()
     plt.xlabel("time [ms]")
@@ -261,7 +250,7 @@ def main():
     
     mask = Espike_times >= t_bins[-1]
     spikecounts, _ = np.histogram(Espike_times[~mask], bins=t_bins)
-    FR = spikecounts / NE / (hist_binwidth*1e-3)
+    FR = spikecounts / params.N / (hist_binwidth*1e-3)
     print("Exc:", FR.mean())
                     
     plt.plot(t_bins[:-1], FR, label="exc")
@@ -269,7 +258,7 @@ def main():
     
     mask = Ispike_times >= t_bins[-1]
     spikecounts, _ = np.histogram(Ispike_times[~mask], bins=t_bins)
-    FR = spikecounts / NI / (hist_binwidth*1e-3)
+    FR = spikecounts / (params.N // 4) / (hist_binwidth*1e-3)
     print("Inh:", FR.mean())
     plt.plot(t_bins[:-1], FR, label="inh")
     
@@ -282,8 +271,13 @@ def main():
 @functimer
 def simulate(params:object, control:object,
         Emean_pre:float, Estd_pre:float, Emean_post:float, Estd_post:float, 
-        Imean_pre:float, Istd_pre:float, Imean_post:float, Istd_post:float, 
-        dt:float, seed:int=None) -> tuple:
+        Imean_pre:float, Istd_pre:float, Imean_post:float, Istd_post:float,
+        seed:int=None) -> tuple:
+    """
+    History:
+        - v0.1: Initial implementation.
+        - v0.1a: Add params and control parameter. Remove dt param (is in params).
+    """
     logger.info("Reset Nest kernel...")
     nest.ResetKernel()
     # nest.SetKernelStatus({'print_time': True})
@@ -291,21 +285,21 @@ def simulate(params:object, control:object,
     seed = seed if seed is not None else rnd.randint(0, 2**32-1)
     logger.info(f"Update seed: {seed}")
     nest.SetKernelStatus({
-        "resolution": dt,
+        "resolution": params.dt,
         "rng_seed": int(seed+1),
         "local_num_threads": 4,
     })
 
     logger.info("Create Network...")
-    Eneurons = nif.create_LIF(NE)
-    Ineurons = nif.create_LIF(NI)
+    Eneurons = nif.create_LIF(params.N)
+    Ineurons = nif.create_LIF(params.N // 4)
     
     logger.info("Connect Network...")
     # Connect(pre, post, conn_spec=None, syn_spec=None, return_synapsecollection=False)¶
-    nest.Connect(Eneurons, Eneurons, conn_spec={'rule': 'fixed_indegree', 'indegree': C_EE}, syn_spec={"weight": syn_weight})
-    nest.Connect(Ineurons, Eneurons, conn_spec={'rule': 'fixed_indegree', 'indegree': C_EI}, syn_spec={"weight": -g*syn_weight})
-    nest.Connect(Eneurons, Ineurons, conn_spec={'rule': 'fixed_indegree', 'indegree': C_IE}, syn_spec={"weight": syn_weight})
-    nest.Connect(Ineurons, Ineurons, conn_spec={'rule': 'fixed_indegree', 'indegree': C_II}, syn_spec={"weight": -g*syn_weight})
+    nest.Connect(Eneurons, Eneurons, conn_spec={'rule': 'fixed_indegree', 'indegree': params.C_EE}, syn_spec={"weight":           params.J})
+    nest.Connect(Ineurons, Eneurons, conn_spec={'rule': 'fixed_indegree', 'indegree': params.C_EI}, syn_spec={"weight": -params.g*params.J})
+    nest.Connect(Eneurons, Ineurons, conn_spec={'rule': 'fixed_indegree', 'indegree': params.C_IE}, syn_spec={"weight":           params.J})
+    nest.Connect(Ineurons, Ineurons, conn_spec={'rule': 'fixed_indegree', 'indegree': params.C_II}, syn_spec={"weight": -params.g*params.J})
 
 
     Evoltmeter = None
@@ -320,19 +314,19 @@ def simulate(params:object, control:object,
 
     logger.info("Stimulate I-Neurons...")
     Igenerator = nest.Create(Generator.noise_generator, 1, params={
-        "mean": Imean_pre, "std": Istd_pre, "dt": dt,
+        "mean": Imean_pre, "std": Istd_pre, "dt": params.dt,
     })
     nif.connect_generator_with_neuron(Igenerator, Ineurons)
     
     logger.info("Stimulate E-Neurons...")
     Egenerator = nest.Create(Generator.noise_generator, 1, params={
-        "mean": Emean_pre, "std": Estd_pre, "dt": dt,
+        "mean": Emean_pre, "std": Estd_pre, "dt": params.dt,
     })
     nif.connect_generator_with_neuron(Egenerator, Eneurons)
 
     logger.info("Run simulation...")
-    nest.Simulate(warmup)
-    nest.Simulate(duration_pre)
+    nest.Simulate(params.warmup)
+    nest.Simulate(params.duration_pre)
 
     logger.info("Change generator settings...")
     Egenerator.mean = Emean_post
@@ -340,21 +334,21 @@ def simulate(params:object, control:object,
     Igenerator.mean = Imean_post
     Igenerator.std  = Istd_post
     logger.info("Stimulate after changing the input...")
-    nest.Simulate(duration_post)
+    nest.Simulate(params.duration_post)
 
     logger.info("Collect exc. Spikes...")
     Esenders, Espike_times = nif.collect_spikes(Espike_detector).values()
-    mask = np.logical_and(Espike_times >= warmup, Espike_times < duration_pre+warmup)
-    logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), NE, duration_pre)}")
-    mask = np.logical_and(Espike_times >= duration_pre+warmup, Espike_times < duration_pre+duration_post+warmup)
-    logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), NE, duration_post)}")
+    mask = np.logical_and(Espike_times >= params.warmup, Espike_times < params.duration_pre+params.warmup)
+    logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N, params.duration_pre)}")
+    mask = np.logical_and(Espike_times >= params.duration_pre+params.warmup, Espike_times < params.duration_pre+params.duration_post+params.warmup)
+    logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N, params.duration_post)}")
     
     logger.info("Collect inh. Spikes...")
     Isenders, Ispike_times = nif.collect_spikes(Ispike_detector).values()
-    mask = np.logical_and(Ispike_times >= warmup, Ispike_times < duration_pre+warmup)
-    logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), NI, duration_pre)}")
-    mask = np.logical_and(Ispike_times >= duration_pre+warmup, Ispike_times < duration_pre+duration_post+warmup)
-    logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), NI, duration_post)}")
+    mask = np.logical_and(Ispike_times >= params.warmup, Ispike_times < params.duration_pre+params.warmup)
+    logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N // 4, params.duration_pre)}")
+    mask = np.logical_and(Ispike_times >= params.duration_pre+params.warmup, Ispike_times < params.duration_pre+params.duration_post+params.warmup)
+    logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N // 4, params.duration_post)}")
 
     if Evoltmeter is None:
         return (Esenders, Espike_times), (Isenders, Ispike_times), None

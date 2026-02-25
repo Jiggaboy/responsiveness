@@ -37,7 +37,7 @@ class Control:
 
 
 #===============================================================================
-# CONTROL
+# PARAMS
 #===============================================================================
 @dataclass
 class Params:
@@ -48,8 +48,7 @@ class Params:
     duration_post: float  = 1000.
     delta_step: float     = nif.tau
     
-    poisson_filename = "poisson.hdf5"
-    network_filename = "network.hdf5"
+    poisson_filename: str = "poisson.hdf5"
     
     def __post_init__(self):
         c = Control()
@@ -71,12 +70,37 @@ class Params:
 
     @property
     def metadata(self):
-        return {"N": self.N, "dt": self.dt, "warmup": self.warmup, "duration_pre": self.duration_pre, "duration_post": self.duration_post, }
+        keys = ["N", "dt", "warmup", "duration_pre", "duration_post"]
+        return {k: getattr(self, k) for k in keys}
+        # return {"N": self.N, "dt": self.dt, "warmup": self.warmup, "duration_pre": self.duration_pre, "duration_post": self.duration_post, }
 
 
-
+@dataclass
+class NetworkParams(Params):
+    network_filename: str = "network.hdf5"
+    
+    # Target-Source notation
+    # Indegree definition
+    C_EE: int               = 100
+    C_EI: int               = 200
+    C_IE: int               = 200
+    C_II: int               = 100
+    
+    J = 0.1
+    g = 8
+    
+    
+    @property
+    def metadata(self):
+        base = super().metadata
+        conn_keys = ["C_EE", "C_EI", "C_IE", "C_II"]
+        conn = {k: getattr(self, k) for k in conn_keys}
+        base.update(conn)
+        return base
 #===============================================================================
 # METHODS
 #===============================================================================
-def load_config():
+def load_config(is_network:bool = False):
+    if is_network:
+        return Control(), NetworkParams()
     return Control(), Params()
