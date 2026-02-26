@@ -62,24 +62,6 @@ def FR_from_siegert(mean:float, std:float, dt:float)->float:
     mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt)
     return siegert(mean_tmp, np.sqrt(var_tmp), tau_ref=nif.t_ref*1e-3, tau_m=nif.tau*1e-3, threshold=nif.V_th*1e-3)
 
-
-def find_parameter_new(value:float, target_FR:float, dt:float, given_parameter:str="mu", low:float=1e-6, high:float=100_000.):
-    # Given parameter must be in the args list of siegert.
-    # Values here are from the free membrane potential
-    # sigma is with the factor 2 already (cf. Tsodyks 1991)
-    if given_parameter not in ("mu", "sigma"):
-        raise ValueError
-    if given_parameter == "mu":
-        search = "sigma"
-    else:
-        search = "mu"
-    kwargs = {given_parameter: value, "dt": dt, "tau_m": nif.tau*1e-3, "tau_ref": nif.t_ref*1e-3, "threshold": nif.V_th*1e-3}
-    
-    loaded = partial(siegert, **kwargs)
-    def objective(param):
-        return loaded(**{search: param}) - target_FR
-    return root_scalar(objective, bracket=[low, high])
-
 #===============================================================================
 # METHODS - LOW LEVEL
 #===============================================================================

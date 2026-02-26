@@ -76,6 +76,7 @@ def main():
             logger.info("Save simulation...")
             run_id = hfile.add_run(pre_FR, post_FR, None, None, None, None, seed=seed)
             hfile.add_data_to_run(run_id, senders, spike_times)
+            hfile.flush()
 
         #===============================================================================
         # POST-PROCESSING
@@ -88,7 +89,7 @@ def main():
                 senders = hfile.get_node(hfile.data, f"run{run_id}").senders.read()
                 spikes_by_sender = get_spikes_by_sender(spike_times, senders, params.N)
                 hfile.add_spikes_by_sender(run_id, spikes_by_sender)
-    
+        hfile.flush()
     logger.info("Finished...")           
 
 
@@ -117,7 +118,7 @@ def simulate(params:object, control:object, dt:float, seed:None) -> tuple:
     generator.rate = post_FR
     
     logger.info("Stimulate after changing the input...")    
-    if control.double_step:
+    if control.brief_stimulus:
         logger.info("Stimulate after changing the input...")
         nest.Simulate(delta_step)
         logger.info("Change generator settings...")

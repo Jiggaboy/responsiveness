@@ -159,9 +159,9 @@ def main():
     
         # Indicate the time point of change
         ax1.axvline(params.warmup+params.duration_pre, color="red", zorder=10, ls="--")
-        if control.double_step:
-            ax1.axvline(params.warmup+params.duration_pre+params.delta_step, color="red", zorder=10, ls="--")
-            ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.delta_step], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+        if control.brief_stimulus:
+            ax1.axvline(params.warmup+params.duration_pre+params.stim_duration, color="red", zorder=10, ls="--")
+            ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.stim_duration], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
         else:
             ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
     

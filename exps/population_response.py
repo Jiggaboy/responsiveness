@@ -19,8 +19,6 @@ __version__ = '0.2'
 #===============================================================================
 from cflogger import logger
 
-
-import nest
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as  mpatches
@@ -32,14 +30,13 @@ import seaborn as sns
 from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
 from config import load_config
 import lib.nest_interface as nif
-from lib.nest_interface import Generator
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
 
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
 from lib.analysis import get_transient
 
-from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm, spikecount_to_FR
+from lib.conversion import spikecount_to_FR
 
 
 #===============================================================================
@@ -53,9 +50,12 @@ plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-plot_transient_estimates = False
+# plot_transient_estimates = False
 
+plot_time_to_first_spike = True
+# plot_time_to_first_spike = False
 
+hue_order = [mean_tag, std_tag, mean_std_tag]
 
 #===============================================================================
 # CONSTANTS
@@ -75,14 +75,16 @@ def main():
     
     pre_FR = 2.
     post_FR = 4.
-    pre_FR = 5.
-    post_FR = 10.
+    
+    # pre_FR = 5.
+    # post_FR = 10.
+    
     # pre_FR = 4.
     # post_FR = 6.
     # post_FR = 12.
     # pre_FR = 4.
     # post_FR = 2.
-    means = np.arange(260, 320+1, 130.)
+    means = np.arange(240, 320+1, 20.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
 
@@ -142,7 +144,7 @@ def main():
         
                     # DELAY 
                     spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)
-                    t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
+                    t_start = params.warmup + params.duration_pre + (control.brief_stimulus * params.stim_duration)
                     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
 
                     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
@@ -186,7 +188,7 @@ def main():
     # PLOT - FIRING RATE AND INDIVIDUAL DELAY ESTIMATES
     #=============================================================================== 
     if plot_rate_and_delays:
-        t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
+        t_start = params.warmup + params.duration_pre + (control.brief_stimulus * params.stim_duration)
         for m, mean in enumerate(means):
             figname = f"Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
             fig, ax1 = plt.subplots(num=figname)
@@ -195,9 +197,9 @@ def main():
         
             # Indicate the time point of change
             ax1.axvline(params.warmup+params.duration_pre, color="red", zorder=10, ls="--")
-            if control.double_step:
-                ax1.axvline(params.warmup+params.duration_pre+params.delta_step, color="red", zorder=10, ls="--")
-                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.delta_step], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+            if control.brief_stimulus:
+                ax1.axvline(params.warmup+params.duration_pre+params.stim_duration, color="red", zorder=10, ls="--")
+                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.stim_duration], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
             else:
                 ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
         
@@ -255,15 +257,10 @@ def main():
                     
                     rgb += [overshoot, osc, undershoot]
                     
-                    # print(fr)
-                    # print(delay)
-                    # print(std_latter)
-                    # print(above)
-                    
                 rgb /= len(gb)
-                print(rgb)
-                ax1.scatter(t_start + delay, 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
-                ax1.text(t_start + delay, 10, Label[tag], va="bottom", ha="center")
+                # print(rgb)
+                ax1.scatter(t_start + delays.mean(), 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
+                ax1.text(t_start + delays.mean(), 10, Label[tag], va="bottom", ha="center")
                     
                     
         
@@ -303,56 +300,149 @@ def main():
     #=============================================================================== 
     if plot_transient_estimates:
         figname_transient = f"Delay estimates (FR: {pre_FR} to {post_FR})"
-        # fig = plt.figure(figname)
         fig, ax_transient = plt.subplots(num=figname_transient)
         ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=(0, 80),)
         ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
-        sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", cut=0, density_norm="width", common_norm=True)
+        sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", 
+                       cut=0, density_norm="width", common_norm=True, 
+                       hue_order=hue_order, ax=ax_transient)
         handles = []
-        for tag in (mean_tag, std_tag, mean_std_tag):
+        for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
-        # save_figure(figname, fig)
+        save_figure(figname, fig)
         
-
-
+        
+        
+        figname_transient = f"Mean delay estimates (FR: {pre_FR} to {post_FR})"
+        fig, ax_meandelay = plt.subplots(num=figname_transient)
+        ax_meandelay.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=(0, 80),)
+        ax_meandelay.set_xticks(ticks=np.arange(len(means)), labels=means)
+        
+        sns.lineplot(
+            data=df_metrics,
+            x="mean",
+            y="delay",
+            hue="tag",
+            marker="o",
+            errorbar="sd",
+            estimator="mean",
+            hue_order=hue_order,
+            ax=ax_meandelay,
+        )
+        sns.lineplot(
+            data=df_metrics,
+            x="mean",
+            y="delay",
+            hue="tag",
+            marker="^",
+            linestyle="--",
+            errorbar=("pi", 50),
+            estimator="median",
+            hue_order=hue_order,
+            ax=ax_meandelay,
+        )
+        labels = []
+        for stat in ("mean", "median"):
+            for tag in hue_order:
+                labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+        handles, _ = ax_meandelay.get_legend_handles_labels()
+        ax_meandelay.legend(handles, labels)
 
                 
     #===============================================================================
     # PLOT -  TIME TO FIRST SPIKE
     #===============================================================================
-    # df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
-    #
-    # with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
-    #     for tag in (mean_tag, std_tag):
-    #         for m, mean in enumerate(means):
-    #             rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-    #             rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]]  
-    #             run_ids = rows_filtered[id_tag]
-    #
-    #             first_spike = []
-    #             for run_id in run_ids:
-    #                 spikes_by_sender = hfile.get_node(hfile.data, f"run{run_id}").spikes_by_sender.read()
-    #                 for spikes in spikes_by_sender:
-    #                     spikes_tmp = spikes[spikes >= params.warmup+params.duration_pre]
-    #                     if len(spikes_tmp) > 0:
-    #                         first_spike.append(spikes_tmp[0])
-    #             new_rows = pd.DataFrame({
-    #                 "firstspike": np.asarray(first_spike)-params.warmup-params.duration_pre,
-    #                 "tag": [tag] * len(first_spike),
-    #                 "mean": [mean] * len(first_spike)
-    #             })
-    #             df = pd.concat([df, new_rows], ignore_index=True)
-    #
-    # figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR})"
-    #
-    # fig, ax_firstspike = plt.subplots(num=figname_spike)
-    # ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
-    #
-    # sns.violinplot(df, x="mean", y="firstspike", hue="tag")
-    # handles = [mpatches.Patch(facecolor="tab:blue", label=r"$\Delta \, \sigma$"),
-    #            mpatches.Patch(facecolor="tab:orange", label=r"$\Delta \, \mu$")]
-    # plt.legend(handles=handles)
+    if plot_time_to_first_spike:
+        df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
+        
+        with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+            for tag in (mean_tag, std_tag, mean_std_tag):
+                for m, mean in enumerate(means):
+                    rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
+                    if tag in (mean_tag, std_tag):
+                        rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
+                    elif tag == mean_std_tag:
+                        mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
+                        rows_filtered = rows[mask]
+                    else:
+                        raise ValueError("No valid tag given...")
+                    run_ids = rows_filtered[id_tag]
+                    
+                    
+                    # TODO: REfactor Logic
+                    first_spike = []
+                    for run_id in run_ids:
+                        # TODO: Add condition    
+                        # if not hfile.has_firstspike(run_id):
+                        #     firstspike_tmp = hfile.get_node(hfile.data, f"run{run_id}").firstspike.read()
+                        #     first_spike.append(firstspike_tmp)
+                        spikes_by_sender = hfile.get_node(hfile.data, f"run{run_id}").spikes_by_sender.read()
+                        for spikes in spikes_by_sender:
+                            spikes_tmp = spikes[spikes >= params.warmup+params.duration_pre]
+                            if len(spikes_tmp) > 0:
+                                first_spike.append(spikes_tmp[0])
+                    new_rows = pd.DataFrame({
+                        "firstspike": np.asarray(first_spike) - params.warmup - params.duration_pre,
+                        "tag": [tag] * len(first_spike),
+                        "mean": [mean] * len(first_spike)
+                    })
+                    df = pd.concat([df, new_rows], ignore_index=True)
+                        
+                    # TODO: Add line here to add the firsttime spike as array?
+                    hfile.add_firstspike(run_id, first_spike)
+        
+    
+    figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR})"
+    fig, ax_firstspike = plt.subplots(num=figname_spike)
+    ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
+            
+    sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
+                       cut=0, density_norm="width", common_norm=True, 
+                       hue_order=hue_order, ax=ax_firstspike)
+    
+    handles = []
+    for tag in hue_order:
+        handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
+    plt.legend(handles=handles)
+    plt.legend(handles=handles)
+
+    
+    figname_spike = f"Mean first spike timing (FR: {pre_FR} to {post_FR})"
+    fig, ax_firstspike = plt.subplots(num=figname_spike)
+    ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
+    
+    sns.lineplot(
+        data=df,
+        x="mean",
+        y="firstspike",
+        hue="tag",
+        marker="o",
+        errorbar=("se", 1.96), # 95% interval
+        estimator="mean",
+        hue_order=hue_order,
+        ax=ax_firstspike,
+    )
+    sns.lineplot(
+        data=df,
+        x="mean",
+        y="firstspike",
+        hue="tag",
+        marker="^",
+        linestyle="--",
+        errorbar=None,
+        # estimator="median",
+        hue_order=hue_order,
+        ax=ax_firstspike,
+    )
+    labels = []
+    for stat in ("mean", "median"):
+        for tag in hue_order:
+            labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+    handles, _ = ax_firstspike.get_legend_handles_labels()
+    ax_firstspike.legend(handles, labels)
+
+
     # save_figure(figname_spike, fig)
         
         

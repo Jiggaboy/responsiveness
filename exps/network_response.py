@@ -146,7 +146,7 @@ def main():
                     np.random.shuffle(run_ids)
                     samples = run_ids[:samples_per_strap] # Bootstrapping
         
-                    t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
+                    t_start = params.warmup + params.duration_pre + (control.brief_stimulus * params.stim_duration)
                     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
                     
                     # DELAY 
@@ -201,7 +201,7 @@ def main():
     # PLOT - FIRING RATE AND INDIVIDUAL DELAY ESTIMATES
     #=============================================================================== 
     if plot_rate_and_delays:
-        t_start = params.warmup + params.duration_pre + (control.double_step * params.delta_step)
+        t_start = params.warmup + params.duration_pre + (control.brief_stimulus * params.stim_duration)
         for m, mean in enumerate(means):
             figname = f"Network: Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
             fig, ax1 = plt.subplots(num=figname)
@@ -210,9 +210,9 @@ def main():
         
             # Indicate the time point of change
             ax1.axvline(params.warmup+params.duration_pre, color="red", zorder=10, ls="--")
-            if control.double_step:
-                ax1.axvline(params.warmup+params.duration_pre+params.delta_step, color="red", zorder=10, ls="--")
-                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.delta_step], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+            if control.brief_stimulus:
+                ax1.axvline(params.warmup+params.duration_pre+params.stim_duration, color="red", zorder=10, ls="--")
+                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.stim_duration], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
             else:
                 ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
         

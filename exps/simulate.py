@@ -2,13 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 Summary: A single population can be stimulated in various ways and the data is processed immediately after.
+
+History:
+    - v0.2: Add more flexibilty with respect to the stimulus, now more stimuli with breaks in between are allowed.
 """
 #===============================================================================
 # PROGRAM METADATA
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1a'
+__version__ = '0.2'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -44,15 +47,16 @@ Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
     
 pre_FR = 2.
 post_FR = 4.
-pre_FR = 5.
-post_FR = 10.
-# pre_FR = 4.
-# # post_FR = 6.
-# post_FR = 12.
+
+# pre_FR = 5.
+# post_FR = 10.
+
+pre_FR = 4.
+post_FR = 12.
+
 # pre_FR = 4.
 # post_FR = 2.
-means = np.arange(240, 320+1, 130.)
-means = np.arange(260, 320+1, 130.)
+means = np.arange(240, 320+1, 20.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
 seeds = np.arange(25, dtype=int)
@@ -95,17 +99,20 @@ def main():
             # Run simulations
             for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
                 for seed in seeds:
+                    # TODO: Add condition here for stimulus, break, and duration.
                     if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
                                                            pre_mean=pre_mean, post_mean=post_mean,
-                                                           pre_std=pre_std, post_std=post_std, seed=seed)):
+                                                           pre_std=pre_std, post_std=post_std, seed=seed,
+                                                           stim_duration=params.stim_duration, break_duration=params.break_duration, stim_reps=params.stim_reps)):
                         logger.info("Skip simulation...")
                         continue
                     logger.info("Run simulation...")
                     senders, spike_times, time, Vm = simulate(params, control, pre_mean, pre_std, post_mean, post_std, seed=seed)
                     
                     logger.info("Save simulation...")
-                    run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed)
+                    run_id = hfile.add_run(pre_FR, post_FR, pre_mean, post_mean, pre_std, post_std, seed=seed, stim_duration=params.stim_duration, break_duration=params.break_duration, stim_reps=params.stim_reps)
                     hfile.add_data_to_run(run_id, senders, spike_times, time, Vm)
+                    hfile.flush()
 
         #===============================================================================
         # POST-PROCESSING
@@ -113,6 +120,7 @@ def main():
         rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR)
         run_ids = rows[id_tag] # id_tag is the tag for all runs
         for run_id in run_ids:
+            logger.info(f"Analyze run {run_id}...")           
             # Add entropy (if not already there)
             if not hfile.has_entropy(run_id) or not hfile.has_Vdistribution(run_id):
                 Vm = hfile.get_node(hfile.data, f"run{run_id}").Vm.read()
@@ -138,6 +146,7 @@ def main():
                 senders = hfile.get_node(hfile.data, f"run{run_id}").senders.read()
                 spikes_by_sender = get_spikes_by_sender(spike_times, senders, params.N)
                 hfile.add_spikes_by_sender(run_id, spikes_by_sender)
+        hfile.flush()
     
     logger.info("Finished...")           
 
@@ -178,17 +187,26 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     nest.Simulate(params.duration_pre)
 
     logger.info("Change generator settings...")
+    logger.info(f"Mean: {mean}")
     generator.mean = post_mean
     generator.std = post_std
     
     logger.info("Stimulate after changing the input...")    
-    if control.double_step:
-        logger.info("Stimulate after changing the input...")
-        nest.Simulate(params.delta_step)
-        logger.info("Change generator settings...")
-        generator.mean = pre_mean
-        generator.std = pre_std
-        nest.Simulate(params.duration_post-params.delta_step)
+    if control.brief_stimulus:
+        for _ in range(params.stim_reps):
+            generator.mean = post_mean
+            generator.std = post_std
+            logger.info("Stimulate after changing the input...")
+            nest.Simulate(params.stim_duration)
+            
+            logger.info("Return to pre generator-settings...")
+            generator.mean = pre_mean
+            generator.std = pre_std
+            
+            logger.info("Simulate break...")
+            nest.Simulate(params.break_duration)
+        logger.info("Simulate remaining duration...")
+        nest.Simulate(params.duration_post - params.stim_reps*(params.stim_duration+params.break_duration))
     else:
         nest.Simulate(params.duration_post)
         

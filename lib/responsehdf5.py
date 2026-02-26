@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Summary: 
+History:
+    - v0.1b: Add firstspike methods.
+    - v0.2: Add StimRun as extension of Run.
 """
 #===============================================================================
 # PROGRAM METADATA
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.2'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -43,6 +45,7 @@ Vm_tag = "Vm"
 seed_tag = "seed"
 spikes_by_sender_tag = "spikes_by_sender"
 binwidth_tag = "binwidth"
+firstspike_tag = "firstspike" # First spike after change per neuron.
 entropy_tag = "entropy"
 dist_pre_tag = "dist_pre"
 dist_post_tag = "dist_post"
@@ -81,7 +84,7 @@ class ResponseHdf5(tb.File):
                 raise FileExistsError
         
         self.data = self.require_group(self.root, data_tag)
-        self.run = self.require_table(self.data, run_tag, Run)
+        self.run = self.require_table(self.data, run_tag, StimRun)
 
 
     def is_current_metadata(self, metadata:dict) -> bool:
@@ -92,8 +95,11 @@ class ResponseHdf5(tb.File):
                     logger.warning(f"Unequal attribute ({key}): {value}")
                     return False
             except KeyError:
-                logger.warning(f"Attribute not in metadata ({key})...")
-                return False                
+                if yes_no(f"{key} not found: Extend current metadata?"):
+                    logger.warning(f"Add attribute to metadata ({key} = {value})...")
+                    metadata_grp._v_attrs[key] = value
+                else:
+                    return False
         return True
     
     
@@ -148,10 +154,14 @@ class ResponseHdf5(tb.File):
     
     
     def add_run(self, 
-                pre_FR:int, post_FR:int, 
-                pre_mean:float, post_mean:float,
-                pre_std:float, post_std:float, seed:int):
-        
+                pre_FR: int, post_FR: int, 
+                pre_mean: float, post_mean: float,
+                pre_std: float, post_std: float, seed:int,
+                stim_duration: float=None, break_duration:float=None, stim_reps:int=None):
+        """
+        History:
+            - v0.1a: Remove self.flush() -> Requires to flush in main script now.
+        """
         row = self.run.row
         run_id = self.next_run_id
         logger.info(f"New run ID: {run_id}")
@@ -163,12 +173,19 @@ class ResponseHdf5(tb.File):
         row["pre_std"] = pre_std
         row["post_std"] = post_std
         row[seed_tag] = seed
+        # StimRun addition
+        row["stim_duration"] = stim_duration
+        row["break_duration"] = break_duration
+        row["stim_reps"] = stim_reps
         row.append()
-        self.flush()
         return run_id
         
         
     def add_data_to_run(self, run_id:int, senders:np.ndarray, spikes:np.ndarray, time:np.ndarray=None, Vm:np.ndarray=None, subgroup:str=None) -> None:
+        """
+        History:
+            - v0.1a: Remove self.flush() -> Requires to flush in main script now.
+        """
         run_data = self.require_group(self.data, run_tag+str(run_id))
         if subgroup is not None:
             target = self.require_group(run_data, subgroup)
@@ -181,7 +198,6 @@ class ResponseHdf5(tb.File):
         if time is not None and Vm is not None:
             self.create_array(target, time_tag, time)
             self.create_array(target, Vm_tag, Vm.astype(np.float32))
-        self.flush()
               
         
     def has_entropy(self, run_id:int) -> bool:
@@ -223,6 +239,9 @@ class ResponseHdf5(tb.File):
         :type dist_pre:np.ndarray
         :param dist_post: Distribution of membrane potentials after the change
         :type dist_post:np.ndarray
+        
+        History:
+            - v0.1a: Remove self.flush() -> Requires to flush in main script now.
         """
         run = self.get_node(self.data, f"run{run_id}")
         if dist_pre_tag in run:
@@ -236,7 +255,6 @@ class ResponseHdf5(tb.File):
             self.create_array(run, dist_post_tag, dist_post.astype(np.float32))
         else:
             self.create_array(run, dist_post_tag, dist_post.astype(np.float32))
-        self.flush()
 
 
     def has_spikes_by_sender(self, run_id:int, subgroup:str=None) -> bool:
@@ -249,7 +267,11 @@ class ResponseHdf5(tb.File):
             return True
         return False
         
-    def add_spikes_by_sender(self, run_id, spikes_by_sender, subgroup:str=None) -> None:
+        
+    def add_spikes_by_sender(self, run_id:int, spikes_by_sender:np.ndarray, subgroup:str=None) -> None:
+        """History:
+            - v0.1a: Remove self.flush() -> Requires to flush in main script now.
+        """
         run_data = self.require_group(self.data, run_tag+str(run_id))
         if subgroup is not None:
             target = self.require_group(run_data, subgroup)
@@ -258,8 +280,35 @@ class ResponseHdf5(tb.File):
         vlarray = self.create_vlarray(target, spikes_by_sender_tag, tb.Float32Atom())
         for spikes in spikes_by_sender:
             vlarray.append(spikes)
-        self.flush()
+
         
+    def has_firstspike(self, run_id:int, subgroup:str=None) -> bool:
+        """
+        Assumption: True if tag is there, hence the assumption that the array is also filled with values.
+        
+        History:
+            - v0.1b: Initial addition.
+        """
+        run_data = self.require_group(self.data, run_tag+str(run_id))
+        if subgroup is not None:
+            target = self.require_group(run_data, subgroup)
+        else:
+            target = run_data
+        if firstspike_tag in target:
+            return True
+        return False
+        
+        
+    def add_firstspike(self, run_id:int, firstspikes:np.ndarray, subgroup:str=None) -> None:
+        """History:
+            - v0.1b: Initial addition.
+        """
+        run_data = self.require_group(self.data, run_tag+str(run_id))
+        if subgroup is not None:
+            target = self.require_group(run_data, subgroup)
+        else:
+            target = run_data
+        self.create_array(target, firstspike_tag, firstspikes)
         
 #===============================================================================
 # DESCRIPTOR CLASSES
@@ -275,6 +324,11 @@ class Run(tb.IsDescription):
     seed        = tb.UInt8Col()  
     pre_entropy = tb.Float32Col()
     
+    
+class StimRun(Run):
+    stim_duration  = tb.Float32Col()
+    break_duration = tb.Float32Col()
+    stim_reps      = tb.Int8Col()
 
 #===============================================================================
 # METHODS

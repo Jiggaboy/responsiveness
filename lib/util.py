@@ -23,6 +23,7 @@ from collections.abc import Iterable
 from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
+import tables as tb
 from pathlib import PurePosixPath
 
 from functools import wraps, partial
@@ -84,8 +85,57 @@ def mkdir(filename:str) -> None:
     path = Path(filename)
     path.parent.absolute().mkdir(parents=True, exist_ok=True)
 
+
 def h5path(*parts):
     return str(PurePosixPath(*parts))
+
+
+def replace_table_with_new_description(h5file:tb.file, table_path:str, new_description:object):
+    """
+    Recreate a PyTables table with a new description.
+
+    Parameters
+    ----------
+    h5file : tables.File
+        Open PyTables file handle (mode="a").
+    table_path : str
+        Full path of the existing table.
+    new_description : dict or IsDescription subclass
+        New table description.
+    """
+
+    old_table = h5file.get_node(table_path)
+    parent = old_table._v_parent
+    name = old_table._v_name
+
+    tmp_name = name + "_tmp"
+
+    # Create new table
+    new_table = h5file.create_table(
+        parent,
+        tmp_name,
+        description=new_description,
+        filters=old_table.filters
+    )
+
+    # Read old data
+    old_data = old_table.read()
+    new_data = np.zeros(old_data.shape, dtype=new_table.dtype)
+
+    # Copy overlapping columns only
+    for col in old_table.colnames:
+        if col in new_table.colnames:
+            new_data[col] = old_data[col]
+
+    new_table.append(new_data)
+    new_table.flush()
+
+    # Replace old table
+    old_table.remove()
+    new_table.move(parent, name)
+
+    return new_table
+
 #===============================================================================
 # FIGURES
 #===============================================================================

@@ -158,9 +158,11 @@ def main():
             # SIMULATE
             for m, mean in enumerate(means):
                 for seed in seeds:
+                    # TODO: Add condition here for stimulus, break, and duration.
                     if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
                                                            pre_mean=pre_Emeans[m], post_mean=post_Emeans[m],
-                                                           pre_std=pre_Estds[m], post_std=post_Estds[m], seed=seed)):
+                                                           pre_std=pre_Estds[m], post_std=post_Estds[m], seed=seed,
+                                                           stim_duration=params.stim_duration, break_duration=params.break_duration, stim_reps=params.stim_reps)):
                         logger.info("Skip simulation...")
                         continue
                     
@@ -171,9 +173,16 @@ def main():
                                                                  )
                         
                     logger.info("Save simulation...")
-                    run_id = hfile.add_run(pre_FR, post_FR, pre_Emeans[m], post_Emeans[m], pre_Estds[m], post_Estds[m], seed=seed)
+                    # TODO: Add stimulus, break, and duration here. Check control.brief_stimulus? Then preload...
+                    stim_kwargs = {}
+                    if control.brief_stimulus:
+                        stim_keys = ["stim_duration", "break_duration", "stim_reps"]
+                        stim_kwargs = {key: getattr(params, key) for key in stim_keys}
+        
+                    run_id = hfile.add_run(pre_FR, post_FR, pre_Emeans[m], post_Emeans[m], pre_Estds[m], post_Estds[m], seed=seed, **stim_kwargs)
                     hfile.add_data_to_run(run_id, Esenders, Espike_times, subgroup=exc_tag)
                     hfile.add_data_to_run(run_id, Isenders, Ispike_times, subgroup=inh_tag)
+                    hfile.flush()
         logger.info("Simulation finished...")
         
         #===============================================================================
@@ -192,29 +201,8 @@ def main():
                     spikes_by_sender = get_spikes_by_sender(spike_times, senders, N)
                     hfile.add_spikes_by_sender(run_id, spikes_by_sender, subgroup=pop)
             logger.info(f"Processing (run id: {run_id}) finished...")
+        hfile.flush()
         logger.info("Processing finished...")
-    return    
-    t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
-        
-    plt.figure()
-    plt.xlabel("time [ms]")
-    plt.ylabel("FR [Hz]")
-    
-    mask = Espike_times >= t_bins[-1]
-    spikecounts, _ = np.histogram(Espike_times[~mask], bins=t_bins)
-    FR = spikecounts / params.N / (hist_binwidth*1e-3)
-    print("Exc:", FR.mean())
-                    
-    plt.plot(t_bins[:-1], FR, label="exc")
-    
-    
-    mask = Ispike_times >= t_bins[-1]
-    spikecounts, _ = np.histogram(Ispike_times[~mask], bins=t_bins)
-    FR = spikecounts / (params.N // 4) / (hist_binwidth*1e-3)
-    print("Inh:", FR.mean())
-    plt.plot(t_bins[:-1], FR, label="inh")
-    
-    plt.legend()
     
     
 #===============================================================================
@@ -285,8 +273,30 @@ def simulate(params:object, control:object,
     Egenerator.std  = Estd_post
     Igenerator.mean = Imean_post
     Igenerator.std  = Istd_post
-    logger.info("Stimulate after changing the input...")
-    nest.Simulate(params.duration_post)
+    
+    if not control.brief_stimulus:
+        logger.info("Stimulate post change...")
+        nest.Simulate(params.duration_post)
+    else:
+        for _ in range(params.stim_reps):
+            logger.info("Stimulate brief stimulus...")
+            Egenerator.mean = Emean_post
+            Egenerator.std  = Estd_post
+            Igenerator.mean = Imean_post
+            Igenerator.std  = Istd_post
+            nest.Simulate(params.stim_duration)
+            
+            logger.info("Stimulate break time...")
+            Egenerator.mean = Emean_pre
+            Egenerator.std  = Estd_pre
+            Igenerator.mean = Imean_pre
+            Igenerator.std  = Istd_pre
+            nest.Simulate(params.break_duration)
+            
+        logger.info("Stimulate remaining duration...")
+        nest.Simulate(params.duration_post - params.stim_reps*(params.stim_duration+params.break_duration))
+        
+        
 
     logger.info("Collect exc. Spikes...")
     Esenders, Espike_times = nif.collect_spikes(Espike_detector).values()
