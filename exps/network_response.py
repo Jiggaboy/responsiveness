@@ -69,7 +69,7 @@ post_FR = 10.
 means = [260, ]
     
     
-hist_binwidth = 2. #ms
+hist_binwidth = 2.#5 #ms
 
 bootstraps = 50     #50
 samples_per_strap = 20 #25

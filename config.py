@@ -50,17 +50,18 @@ class Params:
     duration_pre: float   = 400.
     duration_post: float  = 1000.
     stim_duration: float  = nif.tau
-    break_duration: float = nif.tau
-    stim_reps: int        = 1
+    # break_duration: float = nif.tau * 0.5
+    break_duration: float = 5.
+    stim_reps: int        = 3
     
     poisson_filename: str = "poisson.hdf5"
     
     def __post_init__(self):
         c = Control()
         if not c.brief_stimulus:
-            stim_duration = 0.
-            break_duration = 0.
-            stim_reps = 0
+            self.stim_duration = 0.
+            self.break_duration = 0.
+            self.stim_reps = 0
             self.filename        = "sim_data.hdf5"
             # self.filename        = "randomseeds_data.hdf5"
         elif c.brief_stimulus:

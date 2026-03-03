@@ -34,7 +34,7 @@ from lib.nest_interface import Generator
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
 
 from lib import siegert
-from lib.util import pairwise, save_figure
+from lib.util import pairwise, save_figure, functimer
 from lib.analysis import get_transient
 
 
@@ -48,18 +48,21 @@ Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
 pre_FR = 2.
 post_FR = 4.
 
-# pre_FR = 5.
-# post_FR = 10.
+pre_FR = 5.
+post_FR = 10.
 
-pre_FR = 4.
-post_FR = 12.
+# pre_FR = 4.
+# post_FR = 12.
+
+# pre_FR = 10.
+# post_FR = 5.
 
 # pre_FR = 4.
 # post_FR = 2.
-means = np.arange(240, 320+1, 20.)
+means = np.arange(240, 320+1, 120.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
-seeds = np.arange(25, dtype=int)
+seeds = np.arange(50, dtype=int) #40
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -122,24 +125,25 @@ def main():
         for run_id in run_ids:
             logger.info(f"Analyze run {run_id}...")           
             # Add entropy (if not already there)
-            if not hfile.has_entropy(run_id) or not hfile.has_Vdistribution(run_id):
-                Vm = hfile.get_node(hfile.data, f"run{run_id}").Vm.read()
-                time = hfile.get_node(hfile.data, f"run{run_id}").time.read()
-                
-                # Pre
-                mask = np.logical_and(time >= params.warmup, time < params.warmup+params.duration_pre)
-                dist, _ = np.histogram(Vm[:, mask].ravel(), bins=Vm_entropy_bins, density=True)
-                pre_entropy = entropy(dist, nan_policy="raise")
-                
-                hfile.add_entropy(run_id, pre_entropy)               
-        
-                # Post        
-                buffer = 0.2 * params.duration_post
-                mask_post = np.logical_and(time >= params.warmup+params.duration_pre+buffer, time < params.warmup+params.duration_pre+params.duration_post)
-                dist_post, _ = np.histogram(Vm[:, mask_post].ravel(), bins=Vm_entropy_bins, density=True)
-        
-                hfile.add_Vdistribution(run_id, dist, dist_post)
-                
+            # if not hfile.has_entropy(run_id) or not hfile.has_Vdistribution(run_id):
+            #     Vm = hfile.get_node(hfile.data, f"run{run_id}").Vm.read()
+            #     time = hfile.get_node(hfile.data, f"run{run_id}").time.read()
+            #
+            #     # Pre
+            #     mask = np.logical_and(time >= params.warmup, time < params.warmup+params.duration_pre)
+            #     dist, _ = np.histogram(Vm[:, mask].ravel(), bins=Vm_entropy_bins, density=True)
+            #     pre_entropy = entropy(dist, nan_policy="raise")
+            #
+            #     hfile.add_entropy(run_id, pre_entropy)               
+            #
+            #     # Post        
+            #     buffer = 0.2 * params.duration_post
+            #     mask_post = np.logical_and(time >= params.warmup+params.duration_pre+buffer, time < params.warmup+params.duration_pre+params.duration_post)
+            #     dist_post, _ = np.histogram(Vm[:, mask_post].ravel(), bins=Vm_entropy_bins, density=True)
+            #
+            #     hfile.add_Vdistribution(run_id, dist, dist_post)
+            #
+
                 
             if not hfile.has_spikes_by_sender(run_id):
                 spike_times = hfile.get_node(hfile.data, f"run{run_id}").spikes.read()
@@ -150,7 +154,7 @@ def main():
     
     logger.info("Finished...")           
 
-
+@functimer
 def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_mean:float, post_std:float, seed:None) -> tuple:
     """
     History:
@@ -167,12 +171,13 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     nest.SetKernelStatus({
         "resolution": params.dt,
         "rng_seed": int(seed+1),
-        "local_num_threads": 2,
+        "local_num_threads": 4,
     })
 
     logger.info("Create Network...")
     neurons = nif.create_LIF(params.N)
-    voltmeter = nif.create_voltmeter(params.warmup)
+    voltmeter = None
+    # voltmeter = nif.create_voltmeter(params.warmup)
     spike_detector = nif.create_spike_detector()
     nif.measure_neuron(neurons, voltmeter, spike_detector)
 
@@ -187,7 +192,6 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     nest.Simulate(params.duration_pre)
 
     logger.info("Change generator settings...")
-    logger.info(f"Mean: {mean}")
     generator.mean = post_mean
     generator.std = post_std
     
@@ -218,7 +222,8 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     mask = np.logical_and(spike_times >= params.duration_pre+params.warmup, spike_times < params.duration_pre+params.duration_post+params.warmup)
     logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N, params.duration_post)}")
 
-    # return senders, spike_times, None, None
+    if voltmeter is None:
+        return senders, spike_times, None, None
 
     logger.info("Get free Vm...")
     time, Vm = nif.collect_Vm(voltmeter)

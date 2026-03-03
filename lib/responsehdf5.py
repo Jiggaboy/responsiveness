@@ -192,8 +192,13 @@ class ResponseHdf5(tb.File):
         else:
             target = run_data
         
-        self.create_array(target, senders_tag, senders.astype(np.int16))
-        self.create_array(target, spikes_tag, spikes.astype(np.float32))
+        # Refactor to chunked array create_carray with filters
+        filters = tb.Filters(complevel=2, complib="blosc:zstd", shuffle=True)  # good default
+        
+        self.create_carray(target, senders_tag, obj=senders.astype(np.int16), filters=filters)
+        self.create_carray(target, spikes_tag, obj=spikes.astype(np.float32), filters=filters)
+        # self.create_array(target, senders_tag, senders.astype(np.int16))
+        # self.create_array(target, spikes_tag, spikes.astype(np.float32))
         
         if time is not None and Vm is not None:
             self.create_array(target, time_tag, time)
