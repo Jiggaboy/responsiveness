@@ -62,7 +62,7 @@ ylim_delay = (0, 125)
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-hist_binwidth = 1. #ms
+hist_binwidth = 2. #ms
 
 bootstraps = 50     #50
 samples_per_strap = 25 #25
@@ -87,7 +87,8 @@ def main():
     #
     # pre_FR = 10.
     # post_FR = 5.
-    means = np.arange(240, 320+1, 40.)
+    means = np.arange(240, 320+1, 20.)
+    means = np.arange(220, 320+1, 120.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
 
@@ -239,6 +240,9 @@ def main():
     
                 ax1.plot(bin_center, mu, label=label, color=color)
                 ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
+                
+                halved = mu.size // 2
+                ax1.axhline(mu[halved:].mean(), color=color)
     
                 ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
     

@@ -133,7 +133,7 @@ class ResponseHdf5(tb.File):
         return len(node)
         
         
-    def filter_rows(self, node:tb.Node, **kwargs) -> (None, tb.Group):
+    def filter_rows(self, node:tb.Node, f={}, **kwargs) -> (None, tb.Group):
         """Usage:        
             t = self.filter_rows(run, pre_FR=pre_FR, post_FR=post_FR,
                                   pre_mean=pre_mean, post_mean=post_mean,
@@ -142,6 +142,10 @@ class ResponseHdf5(tb.File):
         condition = ""
         c = "({} == {})"
         for key, value in kwargs.items():
+            if condition:
+                condition += " & "
+            condition += c.format(key, value)
+        for key, value in f.items():
             if condition:
                 condition += " & "
             condition += c.format(key, value)

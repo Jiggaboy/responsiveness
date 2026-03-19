@@ -37,6 +37,9 @@ class Control:
     
     brief_stimulus = True
     brief_stimulus = False
+    
+    long_sim = True
+    long_sim = False
 
 
 #===============================================================================
@@ -52,7 +55,7 @@ class Params:
     stim_duration: float  = nif.tau
     # break_duration: float = nif.tau * 0.5
     break_duration: float = 5.
-    stim_reps: int        = 3
+    stim_reps: int        = 1
     
     poisson_filename: str = "poisson.hdf5"
     
@@ -68,6 +71,10 @@ class Params:
             self.filename        = "brief_stimulus.hdf5"
         else:
             raise ValueError("Invalid arguments")
+            
+        if c.long_sim:
+            self.filename = "long_" + self.filename
+            self.duration_post *= 2
             
         if c.test:
             self.N             = 500  
