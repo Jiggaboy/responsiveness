@@ -59,17 +59,20 @@ plot_transient_estimates = False
 
 pre_FR = 2.
 post_FR = 4.
-pre_FR = 5.
-post_FR = 10.
+
+# pre_FR = 5.
+# post_FR = 10.
+
 # pre_FR = 4.
 # post_FR = 6.
 # post_FR = 12.
 # pre_FR = 4.
 # post_FR = 2.
 means = [260, ]
+means = np.arange(220, 320+1, 20.)
     
     
-hist_binwidth = 2.#5 #ms
+hist_binwidth = 2.5 #ms
 
 bootstraps = 50     #50
 samples_per_strap = 20 #25
@@ -105,6 +108,11 @@ def main():
                     rows_filtered = rows[mask]
                 else:
                     raise ValueError("No valid tag given...")
+
+                stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
+                                           rows_filtered["break_duration"] == params.break_duration, 
+                                           rows_filtered["stim_reps"] == params.stim_reps)
+                rows_filtered = rows_filtered[stim_mask]
                 run_ids = rows_filtered[id_tag]
                 
                 # DELAY ACROSS ALL RUNS

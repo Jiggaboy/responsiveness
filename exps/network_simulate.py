@@ -8,7 +8,7 @@ Summary:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1'
+__version__ = '0.1b'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -45,11 +45,14 @@ control, params = load_config(is_network=True)
 
 Imean_ext   = 280.
 means = [260., ]
+means = [260., 300.,]
+means = np.arange(220, 320+1, 20.)
 
-hist_binwidth = 2.5 #ms
+pre_FR = 2 # for E and I
+post_FR = 4
 
-pre_FR = 5 # for E and I
-post_FR = 10
+# pre_FR = 5 # for E and I
+# post_FR = 10
 FR_I = pre_FR
 
 seeds = np.arange(50, dtype=int)
@@ -60,6 +63,7 @@ def main():
     """
     History:
         - v0.1a: Refactor with params class.
+        - v0.1b: Filter by stimulation parameters.
     """
     #===============================================================================
     # EXPERIMENT  - Simulation with delta for the E population
@@ -173,11 +177,8 @@ def main():
                                                                  )
                         
                     logger.info("Save simulation...")
-                    # TODO: Add stimulus, break, and duration here. Check control.brief_stimulus? Then preload...
-                    stim_kwargs = {}
-                    if control.brief_stimulus:
-                        stim_keys = ["stim_duration", "break_duration", "stim_reps"]
-                        stim_kwargs = {key: getattr(params, key) for key in stim_keys}
+                    stim_keys = ["stim_duration", "break_duration", "stim_reps"]
+                    stim_kwargs = {key: getattr(params, key) for key in stim_keys}
         
                     run_id = hfile.add_run(pre_FR, post_FR, pre_Emeans[m], post_Emeans[m], pre_Estds[m], post_Estds[m], seed=seed, **stim_kwargs)
                     hfile.add_data_to_run(run_id, Esenders, Espike_times, subgroup=exc_tag)
@@ -324,4 +325,6 @@ def simulate(params:object, control:object,
 #===============================================================================
 if __name__ == '__main__':
     main()
+    from lib.util import play_beep
+    play_beep()
     plt.show()

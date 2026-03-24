@@ -78,17 +78,17 @@ def main():
     pre_FR = 2.
     post_FR = 4.
     
-    pre_FR = 5.
-    post_FR = 10.
-    
+    # pre_FR = 5.
+    # post_FR = 10.
+    #
     # pre_FR = 4.
     # # # post_FR = 6.
     # post_FR = 12.
-    #
+    
     # pre_FR = 10.
     # post_FR = 5.
     means = np.arange(240, 320+1, 20.)
-    means = np.arange(220, 320+1, 120.)
+    means = np.arange(220, 320+1, 20.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
 

@@ -48,14 +48,14 @@ Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
 pre_FR = 2.
 post_FR = 4.
 
-pre_FR = 5.
-post_FR = 10.
+# pre_FR = 5.
+# post_FR = 10.
 #
 # pre_FR = 4.
 # post_FR = 12.
 
-# pre_FR = 10.
-# post_FR = 5.
+pre_FR = 10.
+post_FR = 5.
 
 # pre_FR = 4.
 # post_FR = 2.
@@ -245,4 +245,4 @@ if __name__ == '__main__':
     from lib.util import play_beep
     play_beep()
     plt.show()
-    quit()
+

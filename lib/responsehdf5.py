@@ -139,6 +139,7 @@ class ResponseHdf5(tb.File):
                                   pre_mean=pre_mean, post_mean=post_mean,
                                   pre_std=pre_std, post_std=post_std)
         """
+        # TODO: str.join?
         condition = ""
         c = "({} == {})"
         for key, value in kwargs.items():
@@ -161,10 +162,11 @@ class ResponseHdf5(tb.File):
                 pre_FR: int, post_FR: int, 
                 pre_mean: float, post_mean: float,
                 pre_std: float, post_std: float, seed:int,
-                stim_duration: float=None, break_duration:float=None, stim_reps:int=None):
+                stim_duration: float=0., break_duration:float=0., stim_reps:int=0):
         """
         History:
             - v0.1a: Remove self.flush() -> Requires to flush in main script now.
+            - v0.2 : Added the stimulation parameters (stim_duration, break_duration, stim_reps).
         """
         row = self.run.row
         run_id = self.next_run_id
@@ -197,7 +199,7 @@ class ResponseHdf5(tb.File):
             target = run_data
         
         # Refactor to chunked array create_carray with filters
-        filters = tb.Filters(complevel=2, complib="blosc:zstd", shuffle=True)  # good default
+        filters = tb.Filters(complevel=2, complib="zlib", shuffle=True)  # good default
         
         self.create_carray(target, senders_tag, obj=senders.astype(np.int16), filters=filters)
         self.create_carray(target, spikes_tag, obj=spikes.astype(np.float32), filters=filters)

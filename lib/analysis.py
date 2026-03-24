@@ -27,7 +27,7 @@ from lib.util import functimer
 #===============================================================================
 # STATISTICAL METHODS
 #===============================================================================
-@functimer
+# @functimer
 def get_transient(data:np.ndarray, ddof:int=1, min_samples:int=10) -> int:
     """
     Discards the initial {d} samples and calculates the SEM for the {data}.
