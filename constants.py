@@ -20,6 +20,8 @@ mean_std_tag = "both"
 delay_tag = "delay"
 entropy_tag = "entropy"
 
+hue_order = [mean_tag, std_tag, mean_std_tag]
+
 Color = {mean_tag: "tab:blue", std_tag: "tab:orange", mean_std_tag: "tab:green"}
 Label = {mean_tag: r"$\Delta \, \sigma$", std_tag: r"$\Delta \, \mu$", mean_std_tag: r"$\Delta \, \mu$&$\Delta \, \sigma$"}
 #===============================================================================

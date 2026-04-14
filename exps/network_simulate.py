@@ -15,7 +15,6 @@ __version__ = '0.1b'
 #===============================================================================
 from cflogger import logger
 
-
 import nest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -46,7 +45,7 @@ control, params = load_config(is_network=True)
 Imean_ext   = 280.
 means = [260., ]
 means = [260., 300.,]
-means = np.arange(220, 320+1, 20.)
+means = np.arange(220, 320+1, 10.)
 
 pre_FR = 2 # for E and I
 post_FR = 4
@@ -55,7 +54,7 @@ post_FR = 4
 # post_FR = 10
 FR_I = pre_FR
 
-seeds = np.arange(50, dtype=int)
+seeds = np.arange(60, dtype=int)
 #===============================================================================
 # MAIN METHOD
 #===============================================================================
@@ -68,7 +67,7 @@ def main():
     #===============================================================================
     # EXPERIMENT  - Simulation with delta for the E population
     #===============================================================================
-    with ResponseHdf5(params.network_filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
         pre_Emeans = np.zeros(len(means))
         post_Emeans = np.zeros(len(means))
         pre_Estds = np.zeros(len(means))

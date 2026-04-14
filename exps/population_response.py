@@ -5,6 +5,10 @@ Summary:
 
 Description:
 
+History:
+    - 0.2: Adjustment of t_bins with dt/2
+    - 0.2b: Added get_run_ids.
+    - 0.2c: Moved get_run_ids to responsehdf5.
 
 """
 #===============================================================================
@@ -12,7 +16,7 @@ Description:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.2'
+__version__ = '0.2c'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -27,16 +31,18 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
+from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
 from config import load_config
 import lib.nest_interface as nif
-from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
-from lib.analysis import get_transient
+from lib.analysis import get_transient, bootstrap
 
 from lib.conversion import spikecount_to_FR
+
+from cplot.aux import plot_axvline_at_change
 
 
 #===============================================================================
@@ -44,28 +50,30 @@ from lib.conversion import spikecount_to_FR
 #===============================================================================
 
 plot_rate_and_delays = True
-# plot_rate_and_delays = False
+plot_rate_and_delays = False
 
 plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-# plot_transient_estimates = False
+plot_transient_estimates = False
 
 plot_time_to_first_spike = True
-plot_time_to_first_spike = False
+# plot_time_to_first_spike = False
 
-hue_order = [mean_tag, std_tag, mean_std_tag]
+plot_dist_first_and_second_spike = True
+plot_dist_first_and_second_spike = False
 
-ylim_delay = (0, 125)
+
+ylim_delay = (0, 75)
 
 #===============================================================================
 # CONSTANTS
 #===============================================================================
 hist_binwidth = 2. #ms
 
-bootstraps = 50     #50
-samples_per_strap = 25 #25
+bootstraps = 100     #50
+samples_per_strap = 40 #25
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -73,10 +81,21 @@ samples_per_strap = 25 #25
 @functimer  # .6s per seed (25 straps x 10 samples)
 def main():
     control, params = load_config()
-    t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
+    #
+    # t_pre  = np.arange(0., -params.duration_pre, -hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
+    # t_post = np.arange(0.,  params.duration_post, hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2
+    # t_bins = np.concat((t_pre, t_post))
+    #
+    # assert not np.any(t_bins >= params.warmup + params.duration_pre + params.duration_post)
+    # assert np.count_nonzero(t_bins == params.warmup + params.duration_pre - params.dt / 2) == 1
     
-    pre_FR = 2.
+    # t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
+    # index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
+    
+
+    pre_FR  = 2.
     post_FR = 4.
+    post_FR = 6.
     
     # pre_FR = 5.
     # post_FR = 10.
@@ -88,7 +107,7 @@ def main():
     # pre_FR = 10.
     # post_FR = 5.
     means = np.arange(240, 320+1, 20.)
-    means = np.arange(220, 320+1, 20.)
+    means = np.arange(220, 320+1, 40.)
     # means = np.arange(240, 290+1, 10.)
     # means = np.append(means, 320.)
 
@@ -102,74 +121,66 @@ def main():
         all_runs_delays = []
     
         ##### ALL ANALYSES ######################################
-        for tag in (mean_tag, std_tag, mean_std_tag):
+        # for tag in (mean_tag, std_tag, mean_std_tag):
+        for tag in (std_tag, ):
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                if tag in (mean_tag, std_tag):
-                    rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
-                elif tag == mean_std_tag:
-                    mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
-                    rows_filtered = rows[mask]
-                else:
-                    raise ValueError("No valid tag given...")
-
-                stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
-                                           rows_filtered["break_duration"] == params.break_duration, 
-                                           rows_filtered["stim_reps"] == params.stim_reps)
-                rows_filtered = rows_filtered[stim_mask]
-                run_ids = rows_filtered[id_tag]
+                run_ids = get_run_ids(rows, params, tag)
 
     
-                # DELAY ACROSS ALL RUNS
-                spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins)
-                # t_start = params.warmup + params.duration_pre + (control.brief_stimulus * params.stim_duration)
-                t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-                index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
-    
-                SEM, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
-    
-                new_rows = pd.DataFrame({delay_tag: [delay_all_runs * hist_binwidth]})
-                new_rows.index = pd.MultiIndex.from_tuples([(tag, mean)], names=["tag", "mean"])
-                all_runs_delays.append(new_rows)
-    
-                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
-                # Extend the array of firing rates
-                new_rows = pd.DataFrame([FR_all_runs])
-                new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [mean], ["all"]],
-                    names=["tag", "mean", "bootstrap_id"]
-                )
-                all_rates.append(new_rows)
-    
-                # Detailed feature analysis
-                entropies_pre   = np.zeros(bootstraps)
-                delay_estimates = np.zeros(bootstraps)
-                population_FR   = np.zeros((bootstraps, t_bins.size-1))
-                for b in range(bootstraps):
-                    np.random.shuffle(run_ids)
-                    samples = run_ids[:samples_per_strap] # Bootstrapping
-    
-                    # DELAY 
-                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)
-                    t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-                    index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
-    
-                    SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
-                    delay_estimates[b] = delay * hist_binwidth
-                    
+                # # DELAY ACROSS ALL RUNS
+                # spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins)
+                #
+                # SEM, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
+                #
+                # new_rows = pd.DataFrame({delay_tag: [delay_all_runs * hist_binwidth]})
+                # new_rows.index = pd.MultiIndex.from_tuples([(tag, mean)], names=["tag", "mean"])
+                # all_runs_delays.append(new_rows)
+                #
+                # FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
+                # plt.plot(t_bins[:-1], FR_all_runs)
+                # # Extend the array of firing rates
+                # new_rows = pd.DataFrame([FR_all_runs])
+                # new_rows.index = pd.MultiIndex.from_product(
+                #     [[tag], [mean], ["all"]],
+                #     names=["tag", "mean", "bootstrap_id"]
+                # )
+                # all_rates.append(new_rows)
+                #
 
-                    # FIRING RATE
-                    FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
-                    population_FR[b] = FRs
-    
-                    # ENTROPY
-                    pre_entropies  = hfile.read_rows(samples)["pre_entropy"]
-                    entropies_pre[b] = pre_entropies.mean()
+                
+                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, hist_binwidth=hist_binwidth)
+                # # Detailed feature analysis
+                # entropies_pre   = np.zeros(bootstraps)
+                # delay_estimates = np.zeros(bootstraps)
+                # population_FR   = np.zeros((bootstraps, t_bins.size-1))
+                # for b in range(bootstraps):
+                #     np.random.seed(b) # The index is shuffled internally, so independent of the values/run_ids, the order remains.   
+                #     np.random.shuffle(run_ids)
+                #     # samples = run_ids[:samples_per_strap] # Bootstrapping
+                #     samples = np.random.choice(run_ids, samples_per_strap, replace=True)
+                #
+                #     # DELAY 
+                    # spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)[:-1] # offsetting the last bin to avoid boundary effects.
+                #     t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
+                #     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
+                #
+                #     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
+                #     delay_estimates[b] = delay * hist_binwidth
+                #
+                #
+                #     # FIRING RATE
+                    # FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
+                #     population_FR[b] = FRs
+                #
+                #     # ENTROPY
+                #     # pre_entropies  = hfile.read_rows(samples)["pre_entropy"]
+                #     # entropies_pre[b] = pre_entropies.mean()
     
     
                 new_rows = pd.DataFrame({
-                    entropy_tag: entropies_pre,
+                    # entropy_tag: entropies_pre,
                     delay_tag: delay_estimates,
                 })
                 new_rows.index = pd.MultiIndex.from_product(
@@ -179,7 +190,7 @@ def main():
                 all_metrics.append(new_rows)
     
                 # Extend the array of firing rates
-                new_rows = pd.DataFrame(population_FR)
+                new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
                     [[tag], [mean], range(population_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
@@ -189,7 +200,8 @@ def main():
     
         df_rates = pd.concat(all_rates)
         df_metrics = pd.concat(all_metrics)
-        df_all_runs_delays = pd.concat(all_runs_delays)
+        # df_all_runs_delays = pd.concat(all_runs_delays)
+        # plt.xlim(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125)
     
     
     
@@ -204,23 +216,13 @@ def main():
             ax1.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
                     xlim=(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125))
     
-            # Indicate the time point of change
-            ax1.axvline(params.warmup + params.duration_pre, color="red", zorder=10, ls="--")
-            if control.brief_stimulus:
-                offset = params.warmup + params.duration_pre
-                for i in range(params.stim_reps):
-                    d = params.stim_duration + params.break_duration
-                    ax1.axvline(offset + d*i + params.stim_duration, color="red", zorder=10, ls="--")
-                    ax1.axvline(offset + d*i, color="red", zorder=10, ls="--")
-                # TODO: Set ticks properly for multiple reps
-                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, params.warmup+params.duration_pre+params.stim_duration], list(plt.xticks()[0]) + [r"$t_\Delta$", r"$t_\Delta'$"])  
-            else:
-                ax1.set_xticks(list(plt.xticks()[0]) + [params.warmup+params.duration_pre, ], list(plt.xticks()[0]) + [r"$t_\Delta$", ])                
+            plot_axvline_at_change(params, control, ax1)              
     
             ax2 = ax1.twinx()   
             ax2.set(ylabel="Density of delays", yticks=np.linspace(0, 0.5, 3), ylim=(0, 0.5))
     
             bin_center = (t_bins[:-1] + t_bins[1:]) / 2
+            # bin_center = bin_center[:-1]
     
     
             df = df_rates.xs(mean, level=("mean"))
@@ -230,8 +232,8 @@ def main():
                 color = Color[tag]
     
                 # Delay Estimation across all runs
-                d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
-                ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
+                # d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
+                # ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
     
                 # g: rows = sims, cols = points
                 mu = gb.mean(axis=0)
@@ -244,7 +246,7 @@ def main():
                 halved = mu.size // 2
                 ax1.axhline(mu[halved:].mean(), color=color)
     
-                ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
+                # ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
     
                 # Hist delays
                 delays = df_metrics.xs((tag, mean), level=("tag", "mean"))["delay"]
@@ -383,15 +385,7 @@ def main():
             for tag in (mean_tag, std_tag, mean_std_tag):
                 for m, mean in enumerate(means):
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                    if tag in (mean_tag, std_tag):
-                        rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
-                    elif tag == mean_std_tag:
-                        mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
-                        rows_filtered = rows[mask]
-                    else:
-                        raise ValueError("No valid tag given...")
-                    run_ids = rows_filtered[id_tag]
-                    
+                    run_ids = get_run_ids(rows, params, tag)
                     
                     all_first_spike = [] # All spikes 
                     for run_id in run_ids:
@@ -419,12 +413,17 @@ def main():
                     )
                     time_to_first_spike.append(new_rows)
 
-
         df = pd.concat(time_to_first_spike)
         figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms)"
         fig, ax_firstspike = plt.subplots(num=figname_spike)
         ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
                 
+        bins = np.arange(0, 500, 1, dtype=float) + params.warmup+params.duration_pre
+        bins = np.asarray(bins)
+        print(bins)
+        bins = range(int(params.warmup+params.duration_pre), int(params.warmup+params.duration_pre+params.duration_post), 1)
+        
+
         sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
                            cut=0, density_norm="width", common_norm=True, 
                            hue_order=hue_order, ax=ax_firstspike)
@@ -433,9 +432,8 @@ def main():
         for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
-        plt.legend(handles=handles)
-    
         
+    if True:    
         figname_spike = f"Mean first spike timing (FR: {pre_FR} to {post_FR})"
         fig, ax_firstspike = plt.subplots(num=figname_spike)
         ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
@@ -458,8 +456,9 @@ def main():
             hue="tag",
             marker="^",
             linestyle="--",
+            # errorbar=("pi", 50),
             errorbar=None,
-            # estimator="median",
+            estimator="median",
             hue_order=hue_order,
             ax=ax_firstspike,
         )
@@ -471,6 +470,79 @@ def main():
         ax_firstspike.legend(handles, labels)
     
     
+        # save_figure(figname_spike, fig)
+
+    #===============================================================================
+    # PLOT - DISTRIBUTION OF FIRST AND SECOND SPIKE
+    #===============================================================================
+    if plot_dist_first_and_second_spike:
+        time_to_first_spike = []
+        time_to_second_spike = []
+        df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
+        df2 = pd.DataFrame(columns=["secondspike", "tag", "mean"])
+        
+        with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+            for tag in (mean_tag, std_tag, mean_std_tag):
+                for m, mean in enumerate(means):
+                    rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
+                    run_ids = get_run_ids(rows, params, tag)
+                    
+                    
+                    all_first_spike = [] # All spikes 
+                    all_second_spike = [] # All spikes 
+                    for run_id in run_ids:    
+                        run_first_spike = []
+                        run_second_spike = []
+                        spikes_by_sender = hfile.get_node(hfile.data, f"run{run_id}").spikes_by_sender.read()
+                        for spikes in spikes_by_sender:
+                            spikes_tmp = spikes[spikes >= params.warmup+params.duration_pre]
+                            if len(spikes_tmp) > 0:
+                                run_first_spike.append(spikes_tmp[0])
+                            if len(spikes_tmp) > 1:
+                                run_second_spike.append(spikes_tmp[1])
+                        all_first_spike.extend(run_first_spike)
+                        all_second_spike.extend(run_second_spike)
+                                
+                                
+                    new_rows = pd.DataFrame({"firstspike": all_first_spike})
+                    new_rows.index = pd.MultiIndex.from_product(
+                        [[tag], [mean], range(len(all_first_spike))],
+                        names=["tag", "mean", "neuron_id"]
+                    )
+                    time_to_first_spike.append(new_rows)
+                    
+                    new_rows = pd.DataFrame({"secondspike": all_second_spike})
+                    new_rows.index = pd.MultiIndex.from_product(
+                        [[tag], [mean], range(len(all_second_spike))],
+                        names=["tag", "mean", "neuron_id"]
+                    )
+                    time_to_second_spike.append(new_rows)
+
+
+        df = pd.concat(time_to_first_spike)
+        df2 = pd.concat(time_to_second_spike)
+        figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms)"
+        fig, ax_firstspike = plt.subplots(num=figname_spike)
+        ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
+                
+        bins = np.arange(0, 500, 1, dtype=float) + params.warmup+params.duration_pre
+        bins = np.asarray(bins)
+        bins = range(int(params.warmup+params.duration_pre), int(params.warmup+params.duration_pre+params.duration_post), 1)
+        
+        plt.figure("Test")
+        plt.hist(df["firstspike"], bins=bins, density=True)
+        plt.hist(df2["secondspike"], bins=bins, rwidth=0.75, density=True)
+
+        sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
+                           cut=0, density_norm="width", common_norm=True, 
+                           hue_order=hue_order, ax=ax_firstspike)
+        
+        handles = []
+        for tag in hue_order:
+            handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
+        plt.legend(handles=handles)
+        plt.legend(handles=handles)
+        
         # save_figure(figname_spike, fig)
             
         
@@ -538,3 +610,5 @@ if __name__ == '__main__':
     
     plt.show()
     quit()
+
+

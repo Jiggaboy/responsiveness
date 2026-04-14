@@ -17,8 +17,12 @@ __version__ = '0.2'
 # IMPORT STATEMENTS
 #===============================================================================
 from cflogger import logger
+logger.setLevel("WARNING")
 
 import nest
+nest.set_verbosity("M_WARNING")
+nest.print_time = True
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as  mpatches
@@ -46,28 +50,33 @@ Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
 
     
 pre_FR = 2.
+post_FR = 3.
 post_FR = 4.
-
-# pre_FR = 5.
-# post_FR = 10.
+post_FR = 5.
+post_FR = 6.
+# post_FR = 7.
+# post_FR = 8.
+#
+pre_FR = 5.
+post_FR = 10.
+#
+# pre_FR = 10.
+# post_FR = 5.
 #
 # pre_FR = 4.
 # post_FR = 12.
 
-pre_FR = 10.
-post_FR = 5.
-
 # pre_FR = 4.
 # post_FR = 2.
-means = np.arange(220, 320+1, 20.)
+means = np.arange(200, 320+1, 20.)
 # means = np.arange(260, 320+1, 120.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
-seeds = np.arange(50, dtype=int) #40
+seeds = np.arange(200, dtype=int) #40
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
-
+@functimer
 def main():
     control, params = load_config()
 
@@ -80,6 +89,7 @@ def main():
         post_means = np.zeros(len(means))
         pre_stds = np.zeros(len(means))
         post_stds = np.zeros(len(means))
+        # for delta in (mean_tag, ):
         for delta in (mean_tag, std_tag, mean_std_tag):
             for m, mean in enumerate(means):
                 pre_means[m] = mean
@@ -102,6 +112,7 @@ def main():
 
             # Run simulations
             for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
+                logger.warning(f"Tag: {delta}; Mean: {pre_mean}")
                 for seed in seeds:
                     # TODO: Add condition here for stimulus, break, and duration.
                     if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
@@ -155,14 +166,13 @@ def main():
     
     logger.info("Finished...")           
 
-@functimer
+# @functimer
 def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_mean:float, post_std:float, seed:None) -> tuple:
     """
     History:
-        - v0.1: Initital implementation.
+        - v0.1: Initial implementation.
         - v0.1a: Remove dt as parameter (use params.dt instead).
     """
-    
     logger.info("Reset Nest kernel...")
     nest.ResetKernel()
     rnd = np.random.RandomState()
@@ -188,39 +198,41 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
     })
     nif.connect_generator_with_neuron(generator, neurons)
 
-    logger.info("Run simulation...")
-    nest.Simulate(params.warmup)
-    nest.Simulate(params.duration_pre)
 
-    logger.info("Change generator settings...")
-    generator.mean = post_mean
-    generator.std = post_std
+    with nest.RunManager():
+        logger.info("Run simulation...")
+        nest.Run(params.warmup)
+        nest.Run(params.duration_pre)
     
-    logger.info("Stimulate after changing the input...")    
-    if control.brief_stimulus:
-        for _ in range(params.stim_reps):
-            generator.mean = post_mean
-            generator.std = post_std
-            logger.info("Stimulate after changing the input...")
-            nest.Simulate(params.stim_duration)
-            
-            logger.info("Return to pre generator-settings...")
-            generator.mean = pre_mean
-            generator.std = pre_std
-            
-            logger.info("Simulate break...")
-            nest.Simulate(params.break_duration)
-        logger.info("Simulate remaining duration...")
-        nest.Simulate(params.duration_post - params.stim_reps*(params.stim_duration+params.break_duration))
-    else:
-        nest.Simulate(params.duration_post)
+        logger.info("Change generator settings...")
+        generator.mean = post_mean
+        generator.std = post_std
         
+        logger.info("Stimulate after changing the input...")    
+        if control.brief_stimulus:
+            for _ in range(params.stim_reps):
+                generator.mean = post_mean
+                generator.std = post_std
+                logger.info("Stimulate after changing the input...")
+                nest.Run(params.stim_duration)
+                
+                logger.info("Return to pre generator-settings...")
+                generator.mean = pre_mean
+                generator.std = pre_std
+                
+                logger.info("Simulate break...")
+                nest.Run(params.break_duration)
+            logger.info("Simulate remaining duration...")
+            nest.Run(params.duration_post - params.stim_reps*(params.stim_duration+params.break_duration))
+        else:
+            nest.Run(params.duration_post)
+            
 
     logger.info("Collect Spikes...")
     senders, spike_times = nif.collect_spikes(spike_detector).values()
     mask = np.logical_and(spike_times >= params.warmup, spike_times < params.duration_pre+params.warmup)
     logger.info(f"FR pre: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N, params.duration_pre)}")
-    mask = np.logical_and(spike_times >= params.duration_pre+params.warmup, spike_times < params.duration_pre+params.duration_post+params.warmup)
+    mask = np.logical_and(spike_times >= params.duration_pre+params.warmup + 0.25*params.duration_post, spike_times < params.duration_pre+params.duration_post+params.warmup)
     logger.info(f"FR post: {nif.FR_from_spikecount(np.count_nonzero(mask), params.N, params.duration_post)}")
 
     if voltmeter is None:

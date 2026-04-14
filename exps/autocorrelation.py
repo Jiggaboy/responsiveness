@@ -133,7 +133,7 @@ def main():
                 all_rates.append(new_rows)
     df_rates = pd.concat(all_rates)
     
-    plt.figure()
+    plt.figure("Autocorrelation")
     plt.xlabel("time")
     plt.ylabel("FR")
     

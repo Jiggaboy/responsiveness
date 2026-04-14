@@ -25,6 +25,8 @@ import numpy as np
 from pathlib import PosixPath, Path
 from lib.util import yes_no
 
+from constants import mean_tag, std_tag, mean_std_tag
+
 #===============================================================================
 # CONSTANTS
 #===============================================================================
@@ -325,14 +327,14 @@ class ResponseHdf5(tb.File):
 # DESCRIPTOR CLASSES
 #===============================================================================
 class Run(tb.IsDescription):
-    run_id      = tb.UInt32Col()   
+    run_id      = tb.UInt64Col()   
     pre_FR      = tb.Float64Col()   
     post_FR     = tb.Float64Col()   
     pre_mean    = tb.Float64Col()      
     post_mean   = tb.Float64Col()
     pre_std     = tb.Float64Col()      
     post_std    = tb.Float64Col()
-    seed        = tb.UInt8Col()  
+    seed        = tb.UInt32Col()  
     pre_entropy = tb.Float32Col()
     
     
@@ -378,6 +380,36 @@ def get_spikes_by_sender(spikes:np.ndarray, senders:np.ndarray, N:int) -> dict:
     for i, s in enumerate(set(senders)):
         spikes_per_sender[i] = spikes[senders == s]
     return spikes_per_sender
+
+
+def get_run_ids(rows:np.ndarray, params:object, tag:str):
+    """
+    Filters the rows to match the conditions imposed by {params} and {tag}.
+    
+    :param rows:
+    :type rows:
+    :param params: Configuration.
+    :type params: object
+    :param tag: The parameter that is kept constant across the change. Options are "mean", "std", "both".
+    :type tag: str
+    
+    History:
+        - added in 0.2b.
+    """
+    
+    if tag in (mean_tag, std_tag):
+        rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]]
+    elif tag == mean_std_tag:
+        mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
+        rows_filtered = rows[mask]
+    else:
+        raise ValueError("No valid tag given...")
+    stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
+        rows_filtered["break_duration"] == params.break_duration, 
+        rows_filtered["stim_reps"] == params.stim_reps)
+    rows_filtered = rows_filtered[stim_mask]
+    run_ids = rows_filtered[id_tag]
+    return run_ids
 
 
 def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:

@@ -59,7 +59,7 @@ def FR_from_siegert(mean:float, std:float, dt:float)->float:
         Predicted FR.
 
     """
-    mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt)
+    mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt, membrane_capacitance=nif.capacitance)
     return siegert(mean_tmp, np.sqrt(var_tmp), tau_ref=nif.t_ref*1e-3, tau_m=nif.tau*1e-3, threshold=nif.V_th*1e-3)
 
 #===============================================================================
@@ -75,6 +75,13 @@ def error_integral(mu:float, sigma:float, threshold:float, reset_potential:float
 def siegert_plain(mu:float, sigma:float, tau_ref:float, tau_m:float, **kwargs):
     """{tau_m} and {tau_ref} are in seconds."""
     integral, max_error = error_integral(mu, sigma, **kwargs)
+    ### error routine
+    # print(f"Error: {max_error}; Relative error: {max_error/integral}.")
+    # isi_min = tau_ref + tau_m * np.sqrt(np.pi) * (integral + max_error)
+    # isi_max = tau_ref + tau_m * np.sqrt(np.pi) * (integral - max_error)
+    # print(f"Estimated ISI boundaries: {1 / isi_min} to {1 / isi_max}.")
+    # print(f"tau_ref: {tau_ref} relative to second term {tau_m * np.sqrt(np.pi) * integral}")
+    
     isi = tau_ref + tau_m * np.sqrt(np.pi) * integral
     return (1 / isi if not np.isnan(isi) else 0)
 

@@ -38,8 +38,6 @@ class Control:
     brief_stimulus = True
     brief_stimulus = False
     
-    long_sim = True
-    long_sim = False
 
 
 #===============================================================================
@@ -47,7 +45,7 @@ class Control:
 #===============================================================================
 @dataclass
 class Params:
-    N: int                = 2500
+    N: int                = 500
     dt: float             = 0.1
     warmup: float         = 100.
     duration_pre: float   = 400.
@@ -71,10 +69,6 @@ class Params:
             self.filename        = "brief_stimulus.hdf5"
         else:
             raise ValueError("Invalid arguments")
-            
-        if c.long_sim:
-            self.filename = "long_" + self.filename
-            self.duration_post *= 2
             
         if c.test:
             self.N             = 500  
@@ -100,16 +94,19 @@ class NetworkParams(Params):
     C_IE: int               = 200
     C_II: int               = 100
     
-    J = 0.1
+    J = 0.01
     g = 8
     
     def __post_init__(self):
         super().__post_init__()
+        
+        self.N = 2500
+        
         c = Control()
         if not c.brief_stimulus:
-            self.network_filename        = "network.hdf5"
+            self.filename        = "network.hdf5"
         elif c.brief_stimulus:
-            self.network_filename        = "network_stim.hdf5"
+            self.filename        = "network_stim.hdf5"
         else:
             raise ValueError("Invalid arguments")
     
@@ -120,7 +117,7 @@ class NetworkParams(Params):
             self.duration_post = 500.
             self.network_filename = "test_" + self.network_filename
             
-        logger.info(f"Filename: {self.network_filename}") 
+        logger.info(f"Filename: {self.filename}") 
         
         
     @property

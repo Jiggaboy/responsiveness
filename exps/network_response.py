@@ -12,7 +12,7 @@ Description:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.2'
+__version__ = '0.2a'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -49,7 +49,7 @@ plot_rate_and_delays = True
 # plot_rate_and_delays = False
 
 plot_transient_estimates = True
-plot_transient_estimates = False
+# plot_transient_estimates = False
 
 
 
@@ -75,7 +75,10 @@ means = np.arange(220, 320+1, 20.)
 hist_binwidth = 2.5 #ms
 
 bootstraps = 50     #50
-samples_per_strap = 20 #25
+samples_per_strap = 25
+
+hue_order = [mean_tag, std_tag, mean_std_tag]
+ylim_delay = (0, 125)
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -86,7 +89,7 @@ def main():
     t_bins = np.arange(0., params.duration_pre+params.duration_post+hist_binwidth, float(hist_binwidth)) + params.warmup
 
 
-    with ResponseHdf5(params.network_filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # MORE METHODS
         #===============================================================================    
@@ -119,14 +122,14 @@ def main():
                 spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins, subgroup=exc_tag)
                 index = (t_bins >= params.warmup+params.duration_pre).argmax() # Gets first value that is larger than duration_pre
         
-                _, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
+                _, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:-1])
                 
                 
                 new_rows = pd.DataFrame({delay_tag: [delay_all_runs * hist_binwidth]})
                 new_rows.index = pd.MultiIndex.from_tuples([(tag, mean)], names=["tag", "mean"])
                 all_runs_delays.append(new_rows)
                 
-                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
+                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)[:-1]
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame([FR_all_runs])
                 new_rows.index = pd.MultiIndex.from_product(
@@ -137,7 +140,7 @@ def main():
                 
                 # INHIBITION: DELAY ACROSS ALL RUNS
                 spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins, subgroup=inh_tag)
-                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N // 4, hist_binwidth)
+                FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N // 4, hist_binwidth)[:-1]
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame([FR_all_runs])
                 new_rows.index = pd.MultiIndex.from_product(
@@ -151,6 +154,7 @@ def main():
                 Epopulation_FR   = np.zeros((bootstraps, t_bins.size-1))
                 Ipopulation_FR   = np.zeros((bootstraps, t_bins.size-1))
                 for b in range(bootstraps):
+                    np.random.seed(b) # The index is shuffled internally, so independent of the values/run_ids, the order remains.    
                     np.random.shuffle(run_ids)
                     samples = run_ids[:samples_per_strap] # Bootstrapping
         
@@ -158,7 +162,7 @@ def main():
                     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
                     
                     # DELAY 
-                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=exc_tag)
+                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=exc_tag)[:-1]
 
                     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
                     delay_estimates[b] = delay * hist_binwidth
@@ -281,18 +285,59 @@ def main():
     #===============================================================================
     # PLOT - TRANSIENT ESTIMATES
     #=============================================================================== 
+    # Updated in v0.2a
     if plot_transient_estimates:
-        figname_transient = f"Delay estimates (FR: {pre_FR} to {post_FR})"
-        # fig = plt.figure(figname)
+        figname_transient = f"Delay estimates (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
         fig, ax_transient = plt.subplots(num=figname_transient)
-        ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=(0, 80),)
+        ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay,)
         ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
-        sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", cut=0, density_norm="width", common_norm=True)
+        sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", 
+                       cut=0, density_norm="width", common_norm=True, 
+                       hue_order=hue_order, ax=ax_transient)
         handles = []
-        for tag in (mean_tag, std_tag, mean_std_tag):
+        for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
-        # save_figure(figname, fig)
+        save_figure(figname_transient, fig)
+    
+    
+    
+        figname_transient_means = f"Mean delay estimates (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
+        fig, ax_meandelay = plt.subplots(num=figname_transient_means)
+        ax_meandelay.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay,)
+        ax_meandelay.set_xticks(ticks=means, labels=means)
+    
+        sns.lineplot(
+            data=df_metrics,
+            x="mean",
+            y="delay",
+            hue="tag",
+            marker="o",
+            errorbar="sd",
+            estimator="mean",
+            hue_order=hue_order,
+            ax=ax_meandelay,
+        )
+        sns.lineplot(
+            data=df_metrics,
+            x="mean",
+            y="delay",
+            hue="tag",
+            marker="^",
+            linestyle="--",
+            # errorbar=("pi", 50),
+            estimator="median",
+            hue_order=hue_order,
+            ax=ax_meandelay,
+        )
+    
+        labels = []
+        for stat in ("mean", "median"):
+            for tag in hue_order:
+                labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+        handles, _ = ax_meandelay.get_legend_handles_labels()
+        ax_meandelay.legend(handles, labels)
+        save_figure(figname_transient_means, fig)
         
 
 
