@@ -81,6 +81,8 @@ samples_per_strap = 40 #25
 @functimer  # .6s per seed (25 straps x 10 samples)
 def main():
     control, params = load_config()
+    # base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    # params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
     #
     # t_pre  = np.arange(0., -params.duration_pre, -hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
     # t_post = np.arange(0.,  params.duration_post, hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2

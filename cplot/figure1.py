@@ -28,7 +28,7 @@ from lib.analysis import bootstrap
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from cplot.constants import *
-from cplot.aux import plot_axvline_at_change
+from cplot.aux import plot_axvline_at_change, panel_FR_with_delay, hist_delays
 
 #===============================================================================
 # CONSTANTS
@@ -254,46 +254,6 @@ def panel_schematic(ax:object):
 def exp_decay(t:np.ndarray, tau:float=1):
     return np.exp(-t / tau)
 
-
-def panel_FR_with_delay(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object):
-    bin_center = (t_bins[:-1] + t_bins[1:]) / 2
-    
-    
-    df = df_rates.xs(mean, level=("mean"))
-    for tag, g in df.groupby(level="tag"):
-        # Set Colors & Labels
-        label = Label[tag]
-        color = Color[tag]
-        
-        # Filter a potential "all" id:
-        gb = g[g.index.get_level_values("bootstrap_id") != "all"]
-
-        # Delay Estimation across all runs
-        # d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
-        # ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
-
-        # g: rows = sims, cols = points
-        mu = gb.mean(axis=0)
-        std = gb.std(axis=0)
-
-
-        ax.plot(bin_center, mu, label=label, color=color)
-        ax.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
-        
-        halved = mu.size // 2
-        ax.axhline(mu[halved:].mean(), color=color)
-    
-def hist_delays(mean:float, df_delays:pd.DataFrame, t_bins:np.ndarray, ax:object, t_start:float=0.):
-    
-    df = df_delays.xs(mean, level=("mean"))
-    for tag, g in df.groupby(level="tag"):
-        # Set Colors & Labels
-        label = Label[tag]
-        color = Color[tag]
-        
-        # Hist delays
-        delays = g["delay"]
-        ax.hist(delays + t_start, bins=t_bins, color=color, density=True, zorder=-4, rwidth=0.9, alpha=0.5)
 
 #===============================================================================
 if __name__ == '__main__':
