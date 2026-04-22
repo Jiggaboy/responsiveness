@@ -24,10 +24,12 @@ import seaborn as sns
 from config import load_config
 from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 
-from lib.analysis import bootstrap
+from lib.analysis import bootstrap, get_tbins
+from lib.conversion import spikecount_to_FR
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from cplot.constants import *
+import cplot.aux as aux
 from cplot.aux import plot_axvline_at_change, panel_FR_with_delay, hist_delays
 
 #===============================================================================
@@ -83,7 +85,7 @@ def main():
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                 run_ids = get_run_ids(rows, params, tag)
-                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, hist_binwidth=hist_binwidth)
+                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
         
         
         
@@ -131,9 +133,48 @@ def main():
     panel_FR_with_delay(means[1], df_rates, t_bins, ax)
     hist_delays(means[1], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
     ax.legend()
-    
     #===============================================================================
-    # PLOT -  TIME TO FIRST SPIKE
+    # PLOT -  INDIVIDUAL FR
+    #===============================================================================
+    all_rates = []
+    t_bins = get_tbins(params)
+    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+        # for tag in (mean_tag, std_tag, mean_std_tag):
+        for tag in (std_tag, ):
+            logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
+            rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
+            run_ids = get_run_ids(rows, params, tag)
+            
+            
+            for run_id in run_ids:
+                spikecount = load_and_merge_spikes(hfile, [run_id], t_bins)
+                FRs = spikecount_to_FR(spikecount, params.N, params.hist_binwidth)
+                
+                # Extend the array of firing rates
+                new_rows = pd.DataFrame(FRs) # Shape 1 x time
+                new_rows.index = pd.MultiIndex.from_product(
+                    [[tag], [mean], [run_id]],
+                    names=["tag", "mean", "run_id"]
+                )
+                all_rates.append(new_rows)
+    df_rates = pd.concat(all_rates)
+    
+    ax = fig.add_subplot(gs[1, 0])
+    ax.set(**ax_kwargs)
+    sns.lineplot(
+        data=df_rates,
+        x="mean",
+        y="firstspike",
+        hue="tag",
+        marker="o",
+        errorbar=("se", 1.96), # 95% interval
+        estimator="mean",
+        hue_order=hue_order,
+        ax=ax,
+    )
+
+    #===============================================================================
+    # DATA -  TIME TO FIRST SPIKE
     #===============================================================================
     means = np.arange(220, 320+1, 40)
     
@@ -173,8 +214,13 @@ def main():
                 time_to_first_spike.append(new_rows)
     df = pd.concat(time_to_first_spike)
     
-    ax = fig.add_subplot(gs[1, 0])
-    ax.set(xlabel=r"mean drive $\mu_{pre}", ylabel="Time to first spike [ms]", title=f"Time to first spike\n(FR: {pre_FR} to {post_FR})")
+    
+    
+    #===============================================================================
+    # PLOT -  TIME TO FIRST SPIKE
+    #===============================================================================
+    ax = fig.add_subplot(gs[1, 1])
+    ax.set(xlabel=r"mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", title=f"Time to first spike\n(FR: {pre_FR} to {post_FR})")
 
     sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
@@ -186,7 +232,7 @@ def main():
     ax.legend(handles=handles)
         
     
-    ax = fig.add_subplot(gs[1, 1])
+    ax = fig.add_subplot(gs[1, 2])
     ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
         
     sns.lineplot(

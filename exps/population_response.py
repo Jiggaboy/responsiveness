@@ -50,16 +50,16 @@ from cplot.aux import plot_axvline_at_change
 #===============================================================================
 
 plot_rate_and_delays = True
-plot_rate_and_delays = False
+# plot_rate_and_delays = False
 
 plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-plot_transient_estimates = False
+# plot_transient_estimates = False
 
 plot_time_to_first_spike = True
-# plot_time_to_first_spike = False
+plot_time_to_first_spike = False
 
 plot_dist_first_and_second_spike = True
 plot_dist_first_and_second_spike = False
@@ -70,10 +70,30 @@ ylim_delay = (0, 75)
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-hist_binwidth = 2. #ms
+bootstraps        = 100    
+samples_per_strap =  50
 
-bootstraps = 100     #50
-samples_per_strap = 40 #25
+
+
+pre_FR  = 2.
+post_FR = 4.
+# post_FR = 6.
+
+# pre_FR = 5.
+# post_FR = 10.
+#
+# pre_FR = 4.
+# # # post_FR = 6.
+# post_FR = 8.
+# # post_FR = 12.
+
+# pre_FR = 10.
+# post_FR = 5.
+
+means = np.arange(240, 320+1, 20.)
+means = np.arange(220, 320+1, 10.)
+
+
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -81,37 +101,11 @@ samples_per_strap = 40 #25
 @functimer  # .6s per seed (25 straps x 10 samples)
 def main():
     control, params = load_config()
-    # base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    # params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
-    #
-    # t_pre  = np.arange(0., -params.duration_pre, -hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
-    # t_post = np.arange(0.,  params.duration_post, hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2
-    # t_bins = np.concat((t_pre, t_post))
-    #
-    # assert not np.any(t_bins >= params.warmup + params.duration_pre + params.duration_post)
-    # assert np.count_nonzero(t_bins == params.warmup + params.duration_pre - params.dt / 2) == 1
-    
-    # t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-    # index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
-    
 
-    pre_FR  = 2.
-    post_FR = 4.
-    post_FR = 6.
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
     
-    # pre_FR = 5.
-    # post_FR = 10.
-    #
-    # pre_FR = 4.
-    # # # post_FR = 6.
-    # post_FR = 12.
     
-    # pre_FR = 10.
-    # post_FR = 5.
-    means = np.arange(240, 320+1, 20.)
-    means = np.arange(220, 320+1, 40.)
-    # means = np.arange(240, 290+1, 10.)
-    # means = np.append(means, 320.)
 
     
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
@@ -123,8 +117,8 @@ def main():
         all_runs_delays = []
     
         ##### ALL ANALYSES ######################################
-        # for tag in (mean_tag, std_tag, mean_std_tag):
-        for tag in (std_tag, ):
+        for tag in (mean_tag, std_tag, mean_std_tag):
+        # for tag in (std_tag, ):
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
@@ -136,11 +130,11 @@ def main():
                 #
                 # SEM, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
                 #
-                # new_rows = pd.DataFrame({delay_tag: [delay_all_runs * hist_binwidth]})
+                # new_rows = pd.DataFrame({delay_tag: [delay_all_runs * params.hist_binwidth]})
                 # new_rows.index = pd.MultiIndex.from_tuples([(tag, mean)], names=["tag", "mean"])
                 # all_runs_delays.append(new_rows)
                 #
-                # FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
+                # FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, params.hist_binwidth)
                 # plt.plot(t_bins[:-1], FR_all_runs)
                 # # Extend the array of firing rates
                 # new_rows = pd.DataFrame([FR_all_runs])
@@ -152,33 +146,7 @@ def main():
                 #
 
                 
-                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, hist_binwidth=hist_binwidth)
-                # # Detailed feature analysis
-                # entropies_pre   = np.zeros(bootstraps)
-                # delay_estimates = np.zeros(bootstraps)
-                # population_FR   = np.zeros((bootstraps, t_bins.size-1))
-                # for b in range(bootstraps):
-                #     np.random.seed(b) # The index is shuffled internally, so independent of the values/run_ids, the order remains.   
-                #     np.random.shuffle(run_ids)
-                #     # samples = run_ids[:samples_per_strap] # Bootstrapping
-                #     samples = np.random.choice(run_ids, samples_per_strap, replace=True)
-                #
-                #     # DELAY 
-                    # spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)[:-1] # offsetting the last bin to avoid boundary effects.
-                #     t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-                #     index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
-                #
-                #     SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
-                #     delay_estimates[b] = delay * hist_binwidth
-                #
-                #
-                #     # FIRING RATE
-                    # FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
-                #     population_FR[b] = FRs
-                #
-                #     # ENTROPY
-                #     # pre_entropies  = hfile.read_rows(samples)["pre_entropy"]
-                #     # entropies_pre[b] = pre_entropies.mean()
+                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
     
     
                 new_rows = pd.DataFrame({
@@ -435,7 +403,7 @@ def main():
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
         
-    if True:    
+    if plot_time_to_first_spike:    
         figname_spike = f"Mean first spike timing (FR: {pre_FR} to {post_FR})"
         fig, ax_firstspike = plt.subplots(num=figname_spike)
         ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")

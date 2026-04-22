@@ -55,6 +55,8 @@ class Params:
     break_duration: float = 5.
     stim_reps: int        = 1
     
+    hist_binwidth = 2.
+    
     poisson_filename: str = "poisson.hdf5"
     
     def __post_init__(self):

@@ -31,11 +31,11 @@ import seaborn as sns
 
 from constants import mean_tag, std_tag, mean_std_tag, Label, Color
 from config import load_config
-from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, exc_tag
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids, exc_tag
 
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
-from lib.analysis import get_transient
+from lib.analysis import get_transient, get_tbins, get_tstart, bootstrap
 
 from lib.conversion import spikecount_to_FR
 
@@ -57,34 +57,50 @@ ylim_delay = (0, 125)
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-# hist_binwidth = 2.5 #ms
+bootstraps        = 100
+samples_per_strap =  50
 
-bootstraps = 200     #50
-samples_per_strap = 10 #25
+    
+pre_FR = 2.
+post_FR = 4.
+
+# pre_FR = 5.
+# post_FR = 10.
+
+# pre_FR = 4.
+# # # post_FR = 6.
+# post_FR = 12.
+#
+# pre_FR = 10.
+# post_FR = 5.
+means = np.arange(220, 320+1, 140.)
+# means = np.arange(240, 290+1, 10.)
+# means = np.append(means, 320.)
+
+
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
+# def main():
+#     control, params = load_config(is_network=is_network)
+#     plt.figure()
+#     t_start = get_tstart(params)
+#     plt.axhline(t_start)
+#     plt.axhline(499.95, c="yellow")
+#     print(t_start)
+#     for h, hist_binwidth in enumerate((1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6)):
+#         params.hist_binwidth = hist_binwidth
+#         t_bins = get_tbins(params)
+#         index = (t_bins >= t_start).argmax() # Gets first value that is larger than t_start
+#
+#         plt.plot(t_bins, marker=".")
+#         plt.scatter(index, t_bins[index], marker=h)
+#         plt.scatter(index, t_bins[index-1], marker=h)
+#         assert t_bins[index-1] == 499.95
+
 def main():
     control, params = load_config(is_network=is_network)
-
-    
-    pre_FR = 2.
-    post_FR = 4.
-    
-    # pre_FR = 5.
-    # post_FR = 10.
-    
-    # pre_FR = 4.
-    # # # post_FR = 6.
-    # post_FR = 12.
-    #
-    # pre_FR = 10.
-    # post_FR = 5.
-    means = np.arange(220, 320+1, 40.)
-    # means = np.arange(240, 290+1, 10.)
-    # means = np.append(means, 320.)
-
     
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
@@ -93,69 +109,28 @@ def main():
         all_metrics = []
     
         for hist_binwidth in (1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6):
-            print(f"Binwidth: {hist_binwidth}")
-    
-            t_pre  = np.arange(0., -params.duration_pre, -hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
-            t_post = np.arange(0.,  params.duration_post, hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2
-            t_bins = np.concat((t_pre, t_post))
-            
-            assert not np.any(t_bins >= params.warmup + params.duration_pre + params.duration_post)
-            assert np.count_nonzero(t_bins == params.warmup + params.duration_pre - params.dt / 2) == 1
-            
-            t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-            index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
+            params.hist_binwidth = hist_binwidth
+            print(f"Binwidth: {params.hist_binwidth}")
+            t_bins = get_tbins(params)
+            t_start = get_tstart(params)
 
             #  Get spikes with buffer
-            t_start_buffer = params.warmup + params.duration_pre + 0.25 * params.duration_post
-            index_buffered = (t_bins >= t_start_buffer).argmax() # Gets first value that is larger than duration_pre + warmup  
+            t_start_buffer = t_start + 0.25 * params.duration_post
+            index_buffered = (t_bins >= t_start_buffer).argmax() # Index of the first value being larger than the buffered time.
             
-            
-            # plt.figure(f"binwidht: {hist_binwidth}")
             ##### ALL ANALYSES ######################################
             for tag in (mean_tag, std_tag, mean_std_tag):
                 for m, mean in enumerate(means):
                     logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                    if tag in (mean_tag, std_tag):
-                        rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
-                    elif tag == mean_std_tag:
-                        mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
-                        rows_filtered = rows[mask]
-                    else:
-                        raise ValueError("No valid tag given...")
+                    run_ids = get_run_ids(rows, params, tag)
     
-                    stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
-                                               rows_filtered["break_duration"] == params.break_duration, 
-                                               rows_filtered["stim_reps"] == params.stim_reps)
-                    rows_filtered = rows_filtered[stim_mask]
-                    run_ids = rows_filtered[id_tag]
-    
-        
-                    # Detailed feature analysis
-                    stds            = np.zeros(bootstraps)
-                    delay_estimates = np.zeros(bootstraps)
-                    for b in range(bootstraps):
-                        np.random.seed(b) # The index is shuffled internally, so independent of the values/run_ids, the order remains.
-                        # np.random.shuffle(run_ids)
-                        # samples = run_ids[:samples_per_strap] # Bootstrapping
-                        samples = np.random.choice(run_ids, samples_per_strap, replace=True)
-
-                        #  Get spikes
-                        subgroup = exc_tag if is_network else None
-                        spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=subgroup)
-                                          
-                        # FIRING RATE after Buffer
-                        FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, hist_binwidth)
-                        stds[b] = FRs[index_buffered:].std(ddof=1)
-                        # plt.plot(t_bins[index:-1-1], FRs[index:])
-                        
-                        
-                        # # DELAY(No Buffer)
-                        # t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-                        # index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup
-        
-                        SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
-                        delay_estimates[b] = delay * hist_binwidth
+                    
+                    
+                    subgroup = exc_tag if is_network else None
+                    t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, subgroup=subgroup)
+                    
+                    stds = population_FR[:, index_buffered:].std(axis=1, ddof=1)
                         
     
                     new_rows = pd.DataFrame({
@@ -181,18 +156,16 @@ def main():
          .groupby(['tag', 'mean', 'binwidth'], as_index=False)[['std', 'delay']]
          .mean()
     )
+    plt.figure(f"Mean: Delay over Variance (network={is_network})")
+    sns.lineplot(h, x="std", y="delay", hue="tag", style="mean",
+                    hue_order=hue_order)
+    
     
     m = (
         df.reset_index()
          .groupby(['tag', 'mean', 'binwidth'], as_index=False)[['std', 'delay']]
          .median()
     )
-
-
-    plt.figure(f"Mean: Delay over Variance (network={is_network})")
-    sns.lineplot(h, x="std", y="delay", hue="tag", style="mean",
-                    hue_order=hue_order)
-    
     plt.figure(f"Median: Delay over Variance (network={is_network})")
     sns.lineplot(m, x="std", y="delay", hue="tag", style="mean",
                     hue_order=hue_order, markers=True)

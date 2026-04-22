@@ -45,15 +45,14 @@ from lib.analysis import get_transient
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-# hist_binwidth = 2.5 #ms
 Vm_entropy_bins = np.arange(nif.V_reset-5, nif.V_th+1, .1)
 
     
 pre_FR = 2.
 post_FR = 3.
-post_FR = 4.
-# post_FR = 5.
-post_FR = 6.
+# post_FR = 4.
+post_FR = 5.
+# post_FR = 6.
 # post_FR = 7.
 # post_FR = 8.
 #
@@ -62,13 +61,16 @@ post_FR = 6.
 #
 # pre_FR = 10.
 # post_FR = 5.
-#
+# # #
 # pre_FR = 4.
-# post_FR = 12.
+# post_FR = 6.
+# post_FR = 8.
+# post_FR = 10.
+# # post_FR = 12.
 
 # pre_FR = 4.
 # post_FR = 2.
-means = np.arange(220, 320+1, 40.)
+means = np.arange(200, 320+1, 10.)
 # means = np.arange(260, 320+1, 120.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
@@ -79,8 +81,8 @@ seeds = np.arange(200, dtype=int) #40
 @functimer
 def main():
     control, params = load_config()
-    # base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    # params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
 
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================

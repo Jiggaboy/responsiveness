@@ -106,7 +106,3 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
         ax.set_xticks(list(ax.get_xticks()) + [t_onset, ], 
                       list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", ]) 
 
-
-#===============================================================================
-if __name__ == '__main__':
-    main()
