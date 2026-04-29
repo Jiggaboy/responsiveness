@@ -404,9 +404,9 @@ def get_run_ids(rows:np.ndarray, params:object, tag:str):
         rows_filtered = rows[mask]
     else:
         raise ValueError("No valid tag given...")
-    stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
-        rows_filtered["break_duration"] == params.break_duration, 
-        rows_filtered["stim_reps"] == params.stim_reps)
+    stim_mask = np.logical_and.reduce((rows_filtered["stim_duration"] == params.stim_duration,
+        rows_filtered["break_duration"] == params.break_duration,
+        rows_filtered["stim_reps"] == params.stim_reps))
     rows_filtered = rows_filtered[stim_mask]
     run_ids = rows_filtered[id_tag]
     return run_ids

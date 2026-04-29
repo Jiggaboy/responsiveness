@@ -56,8 +56,8 @@ post_FR = 5.
 # post_FR = 7.
 # post_FR = 8.
 #
-# pre_FR = 5.
-# post_FR = 10.
+pre_FR = 5.
+post_FR = 10.
 #
 # pre_FR = 10.
 # post_FR = 5.
@@ -82,9 +82,9 @@ seeds = np.arange(200, dtype=int) #40
 def main():
     control, params = load_config()
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
+    tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
 
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # SIMULATION
         #===============================================================================
@@ -256,8 +256,11 @@ def simulate(params:object, control:object, pre_mean:float, pre_std:float, post_
 
 
 if __name__ == '__main__':
-    main()
     from lib.util import play_beep
-    play_beep()
+    play_beep(repeat=1)
+    main()
+    play_beep(pause = 0.5)
+    import time
+    time.sleep(1)
     plt.show()
 

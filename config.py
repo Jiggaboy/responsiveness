@@ -45,30 +45,43 @@ class Control:
 #===============================================================================
 @dataclass
 class Params:
+    control: object
     N: int                = 500
     dt: float             = 0.1
     warmup: float         = 100.
     duration_pre: float   = 400.
     duration_post: float  = 1000.
-    stim_duration: float  = nif.tau
+    # stim_duration: float  = nif.tau #* 2
+    stim_duration: float  = nif.tau / 2
     # break_duration: float = nif.tau * 0.5
     break_duration: float = 5.
-    stim_reps: int        = 1
+    stim_reps: int        = 5
     
     hist_binwidth = 2.
     
     poisson_filename: str = "poisson.hdf5"
     
     def __post_init__(self):
-        c = Control()
+        filename = self.filename
+
+
+    @property
+    def metadata(self):
+        keys = ["N", "dt", "warmup", "duration_pre", "duration_post"]
+        return {k: getattr(self, k) for k in keys}
+
+
+    @property
+    def filename(self):
+        c = self.control
         if not c.brief_stimulus:
             self.stim_duration = 0.
             self.break_duration = 0.
             self.stim_reps = 0
-            self.filename        = "sim_data.hdf5"
-            # self.filename        = "randomseeds_data.hdf5"
+            filename        = "sim_data.hdf5"
         elif c.brief_stimulus:
-            self.filename        = "brief_stimulus.hdf5"
+            self.stim_duration = np.round(self.stim_duration)
+            filename        = f"stimulus_{self.stim_duration}.hdf5"
         else:
             raise ValueError("Invalid arguments")
             
@@ -76,16 +89,10 @@ class Params:
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
-            self.filename = "test_" + self.filename
+            filename = "test_" + filename
             
-        logger.info(f"Filename: {self.filename}") 
-
-    @property
-    def metadata(self):
-        keys = ["N", "dt", "warmup", "duration_pre", "duration_post"]
-        return {k: getattr(self, k) for k in keys}
-        # return {"N": self.N, "dt": self.dt, "warmup": self.warmup, "duration_pre": self.duration_pre, "duration_post": self.duration_post, }
-
+        logger.info(f"Filename: {filename}") 
+        return filename
 
 @dataclass
 class NetworkParams(Params):    
@@ -101,14 +108,17 @@ class NetworkParams(Params):
     
     def __post_init__(self):
         super().__post_init__()
-        
         self.N = 2500
         
-        c = Control()
+        
+    @property
+    def filename(self):
+        c = self.control
         if not c.brief_stimulus:
-            self.filename        = "network.hdf5"
+            filename        = "network.hdf5"
         elif c.brief_stimulus:
-            self.filename        = "network_stim.hdf5"
+            self.stim_duration = np.round(self.stim_duration)
+            filename        = f"network_stim_{self.stim_duration}.hdf5"
         else:
             raise ValueError("Invalid arguments")
     
@@ -117,10 +127,10 @@ class NetworkParams(Params):
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
-            self.network_filename = "test_" + self.network_filename
+            filename = "test_" + filename
             
-        logger.info(f"Filename: {self.filename}") 
-        
+        logger.info(f"Filename: {filename}") 
+        return filename
         
     @property
     def metadata(self):
@@ -132,7 +142,10 @@ class NetworkParams(Params):
 #===============================================================================
 # METHODS
 #===============================================================================
-def load_config(is_network:bool = False):
+def load_config(is_network:bool = False, no_stim:bool = False):
+    control = Control()
+    if no_stim:
+        control.brief_stimulus = False
     if is_network:
-        return Control(), NetworkParams()
-    return Control(), Params()
+        return control, NetworkParams(control)
+    return control, Params(control)

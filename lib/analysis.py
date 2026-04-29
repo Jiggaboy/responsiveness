@@ -125,7 +125,7 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
     # Time management    
     t_bins = get_tbins(params)
     t_start = get_tstart(params)
-    index = (t_bins >= t_start).argmax()-1 # Gets first value that is larger than t_start
+    index = (t_bins >= t_start).argmax() - 1 # Gets first value that is larger than t_start
     
     delay_estimates = np.zeros(rep)
     population_FR   = np.zeros((rep, t_bins.size-1))
@@ -147,17 +147,51 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
     return t_bins, delay_estimates, population_FR
 
 
-def get_response_kernels(params:object, df:pd.DataFrame, delays:pd.Series, threshold:int=8, std_margin:float=0.2):
+def get_response_kernel(params:object, df:pd.DataFrame, delay:pd.Series, threshold:int=8, std_margin:float=0.1):
     # Identifies how many True values are consecutive.
     consecutive_True = lambda condition: [ sum( 1 for _ in group ) for key, group in itertools.groupby( condition ) if key ]
     
     t_bins = get_tbins(params)
     t_start = params.warmup + params.duration_pre
+    index_start = (t_bins >= t_start).argmax() - 1
+    
+    halved = df[index_start:].size // 2
+    std_latter = df[-halved:].std(ddof=1)
+    mu_latter = df[-halved:].mean()
+    
+    index = (t_bins >= t_start + delay).argmax() - 1# Gets the last relevant index as the transient is over after the delay
+    
+    # Gets all those FRs that are above 1.5 the std of the target post_FR/mu_latter
+    osc_over    = df[index_start:index] > (mu_latter + std_margin*std_latter)
+    # Gets the first True value
+    osc_first_over = osc_over.idxmax() if any(osc_over) else 0
+    # Gets all those FRs that are below 1.5 the std of the target post_FR/mu_latter after the overshoot!
+    osc_under   = df[osc_first_over:index] < (mu_latter - std_margin*std_latter)
+    # Counts as oscillatory if there are {threshold} values above AND {threshold} below the post_FR/mu_latter
+    osc = True if np.count_nonzero(osc_over) > threshold and np.count_nonzero(osc_under) > threshold else False
+
+    # Strong overshoot as more than 3 times the std
+    above = df[:index] > (std_margin*std_latter + mu_latter)
+    # And also more than {threshold} values being above.
+    overshoot = True if np.any(above) and np.max(consecutive_True(above)) > threshold else False
+    overshoot = False if osc else overshoot
+
+    undershoot = False if osc or overshoot else True
+
+    return np.asarray([overshoot, osc, undershoot])
+
+def get_response_kernels(params:object, df:pd.DataFrame, delays:pd.Series, threshold:int=8, std_margin:float=0.1):
+    # Identifies how many True values are consecutive.
+    consecutive_True = lambda condition: [ sum( 1 for _ in group ) for key, group in itertools.groupby( condition ) if key ]
+    
+    t_bins = get_tbins(params)
+    t_start = params.warmup + params.duration_pre
+    index_start = (t_bins >= t_start).argmax() - 1
     
     mu = df.mean(axis=0)
     std = df.std(axis=0)
     
-    halved = mu.size // 2
+    halved = mu[index_start:].size // 2
     std_latter = std[-halved:].mean()
     mu_latter = mu[-halved:].mean()
     
@@ -166,21 +200,22 @@ def get_response_kernels(params:object, df:pd.DataFrame, delays:pd.Series, thres
     
     # Iter over FR & delay combinations
     for (_, fr), delay in zip(df.iterrows(), delays):
-        index = (t_bins >= t_start + delay).argmax() # Gets the last relevant index as the transient is over after the delay
+        index = (t_bins >= t_start + delay).argmax() - 1# Gets the last relevant index as the transient is over after the delay
     
         # Gets all those FRs that are above 1.5 the std of the target post_FR/mu_latter
-        osc_over    = fr[:index] > (std_margin*std_latter + mu_latter)
+        osc_over    = fr[index_start:index] > (mu_latter + std_margin*std_latter)
         # Gets the first True value
-        osc_first_over = osc_over.argmax() 
+        osc_first_over = osc_over.idxmax() if any(osc_over) else 0
         # Gets all those FRs that are below 1.5 the std of the target post_FR/mu_latter after the overshoot!
-        osc_under   = fr[osc_first_over:index] < (std_margin*std_latter + mu_latter)
+        osc_under   = fr[osc_first_over:index] < (mu_latter - std_margin*std_latter)
         # Counts as oscillatory if there are {threshold} values above AND {threshold} below the post_FR/mu_latter
-        osc = True if np.count_nonzero(osc_first_over) > threshold and np.count_nonzero(osc_under) > threshold else False
+        osc = True if np.count_nonzero(osc_over) > threshold and np.count_nonzero(osc_under) > threshold else False
     
         # Strong overshoot as more than 3 times the std
         above = fr[:index] > (std_margin*std_latter + mu_latter)
         # And also more than {threshold} values being above.
         overshoot = True if np.any(above) and np.max(consecutive_True(above)) > threshold else False
+        overshoot = False if osc else overshoot
     
         undershoot = False if osc or overshoot else True
 

@@ -50,19 +50,19 @@ from cplot.aux import plot_axvline_at_change
 #===============================================================================
 
 plot_rate_and_delays = True
-# plot_rate_and_delays = False
+plot_rate_and_delays = False
 
 plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-# plot_transient_estimates = False
+plot_transient_estimates = False
 
 plot_time_to_first_spike = True
 plot_time_to_first_spike = False
 
 plot_dist_first_and_second_spike = True
-plot_dist_first_and_second_spike = False
+# plot_dist_first_and_second_spike = False
 
 
 ylim_delay = (0, 75)
@@ -79,19 +79,20 @@ pre_FR  = 2.
 post_FR = 4.
 # post_FR = 6.
 
-# pre_FR = 5.
-# post_FR = 10.
+pre_FR = 5.
+post_FR = 10.
 #
 # pre_FR = 4.
-# # # post_FR = 6.
+# # # # post_FR = 6.
 # post_FR = 8.
-# # post_FR = 12.
+# post_FR = 10.
+# post_FR = 12.
 
 # pre_FR = 10.
 # post_FR = 5.
 
-means = np.arange(240, 320+1, 20.)
-means = np.arange(220, 320+1, 10.)
+means = np.arange(240, 320+1, 40.)
+# means = np.arange(220, 320+1, 10.)
 
 
 #===============================================================================
@@ -103,12 +104,12 @@ def main():
     control, params = load_config()
 
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    params.filename = base_filename + f"_{pre_FR}_{post_FR}_" + f".{suffix}"
+    tmp_filename = base_filename + f"_{pre_FR}_{post_FR}" + f".{suffix}"
     
     
 
     
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # MORE METHODS
         #===============================================================================    
@@ -351,7 +352,7 @@ def main():
         time_to_first_spike = []
         df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
         
-        with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+        with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
             for tag in (mean_tag, std_tag, mean_std_tag):
                 for m, mean in enumerate(means):
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
@@ -449,9 +450,9 @@ def main():
         time_to_first_spike = []
         time_to_second_spike = []
         df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
-        df2 = pd.DataFrame(columns=["secondspike", "tag", "mean"])
+
         
-        with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+        with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
             for tag in (mean_tag, std_tag, mean_std_tag):
                 for m, mean in enumerate(means):
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
@@ -460,9 +461,11 @@ def main():
                     
                     all_first_spike = [] # All spikes 
                     all_second_spike = [] # All spikes 
+                    all_third_spike = [] # All spikes 
                     for run_id in run_ids:    
                         run_first_spike = []
                         run_second_spike = []
+                        run_third_spike = []
                         spikes_by_sender = hfile.get_node(hfile.data, f"run{run_id}").spikes_by_sender.read()
                         for spikes in spikes_by_sender:
                             spikes_tmp = spikes[spikes >= params.warmup+params.duration_pre]
@@ -470,39 +473,47 @@ def main():
                                 run_first_spike.append(spikes_tmp[0])
                             if len(spikes_tmp) > 1:
                                 run_second_spike.append(spikes_tmp[1])
+                            else:
+                                run_second_spike.append(np.nan)
+                            if len(spikes_tmp) > 2:
+                                run_third_spike.append(spikes_tmp[2])
+                            else:
+                                run_third_spike.append(np.nan)
                         all_first_spike.extend(run_first_spike)
                         all_second_spike.extend(run_second_spike)
+                        all_third_spike.extend(run_third_spike)
                                 
                                 
-                    new_rows = pd.DataFrame({"firstspike": all_first_spike})
+                    new_rows = pd.DataFrame({"firstspike": all_first_spike, "secondspike": all_second_spike, "thirdspike": all_third_spike})
                     new_rows.index = pd.MultiIndex.from_product(
                         [[tag], [mean], range(len(all_first_spike))],
                         names=["tag", "mean", "neuron_id"]
                     )
                     time_to_first_spike.append(new_rows)
-                    
-                    new_rows = pd.DataFrame({"secondspike": all_second_spike})
-                    new_rows.index = pd.MultiIndex.from_product(
-                        [[tag], [mean], range(len(all_second_spike))],
-                        names=["tag", "mean", "neuron_id"]
-                    )
-                    time_to_second_spike.append(new_rows)
 
 
         df = pd.concat(time_to_first_spike)
-        df2 = pd.concat(time_to_second_spike)
         figname_spike = f"Spike to first spike (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms)"
         fig, ax_firstspike = plt.subplots(num=figname_spike)
         ax_firstspike.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
                 
-        bins = np.arange(0, 500, 1, dtype=float) + params.warmup+params.duration_pre
+        bins = np.arange(0, 500, 1, dtype=float) + params.warmup + params.duration_pre
         bins = np.asarray(bins)
         bins = range(int(params.warmup+params.duration_pre), int(params.warmup+params.duration_pre+params.duration_post), 1)
         
-        plt.figure("Test")
-        plt.hist(df["firstspike"], bins=bins, density=True)
-        plt.hist(df2["secondspike"], bins=bins, rwidth=0.75, density=True)
+        for (tag, mean), gb in df.groupby(level=("tag", "mean")):
+            plt.figure(f"Test - {tag} {mean}")
+            plt.hist(gb["firstspike"], bins=bins, density=True)
+            plt.errorbar(gb["firstspike"].mean(), 0.011, xerr=gb["firstspike"].std(ddof=1), marker="o")
+            plt.hist(gb["secondspike"], bins=bins, density=True, rwidth=0.9, alpha=0.9)
+            plt.errorbar(gb["secondspike"].mean(), 0.010, xerr=gb["secondspike"].std(ddof=1), marker="o")
+            plt.hist(gb["thirdspike"], bins=bins, density=True, rwidth=0.75, alpha=0.75)
+            plt.errorbar(gb["thirdspike"].mean(), 0.009, xerr=gb["thirdspike"].std(ddof=1), marker="o")
 
+            plt.ylim(0, 0.0125)
+            plt.xlim(495, 1200)
+            plt.legend()
+            
         sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
                            cut=0, density_norm="width", common_norm=True, 
                            hue_order=hue_order, ax=ax_firstspike)
@@ -511,10 +522,47 @@ def main():
         for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
-        plt.legend(handles=handles)
         
         # save_figure(figname_spike, fig)
             
+        pre_means = np.zeros(len(means))
+        post_means = np.zeros(len(means))
+        pre_stds = np.zeros(len(means))
+        post_stds = np.zeros(len(means))
+        # for delta in (mean_tag, ):
+        fig, axes = plt.subplots(nrows=2)
+        for delta in (mean_tag, std_tag, mean_std_tag):
+            for m, mean in enumerate(means):
+                pre_means[m] = mean
+                pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=params.dt).root, 2)
+                pre_stds[m] = pre_std
+
+                if delta == mean_tag:
+                    post_means[m] = round(siegert.find_parameter(pre_std, target_FR=post_FR, given_parameter=std_tag, dt=params.dt).root, 2) # ie delta mean
+                    post_stds[m] = pre_std
+                elif delta == std_tag:
+                    post_means[m] = mean
+                    post_stds[m] = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2) # ie delta std
+                elif delta == mean_std_tag:
+                    post_std = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2)
+                    post_stds[m] = pre_std + (post_std - pre_std) / 2
+                    post_mean  = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=params.dt, given_parameter=std_tag).root, 2)
+                    post_means[m] = mean + (post_mean - mean) / 2
+                else:
+                    raise ValueError("No valid delta chosen")
+        
+            if delta == mean_tag:
+                ls = "solid"
+            elif delta == std_tag:
+                ls = "dashed"
+            else:
+                ls = "dotted"
+        
+            axes[0].plot(pre_means, pre_stds, marker="o", ls=ls)
+            axes[0].plot(post_means, post_stds, marker=">", ls=ls)
+            
+            axes[1].plot(pre_means, post_means/pre_means, marker="o", ls=ls)
+            axes[1].plot(pre_means, post_stds /pre_stds, marker="x", ls=ls)
         
 
     #===============================================================================
@@ -524,7 +572,7 @@ def main():
     # from scipy.stats import wasserstein_distance
     # df = pd.DataFrame(columns=["emd", "tag", "mean"])
     #
-    # with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    # with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
     #     for tag in (mean_tag, std_tag):
     #         for m, mean in enumerate(means):
     #             rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)

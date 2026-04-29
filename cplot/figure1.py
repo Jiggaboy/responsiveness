@@ -29,20 +29,28 @@ from lib.conversion import spikecount_to_FR
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from cplot.constants import *
-import cplot.aux as aux
-from cplot.aux import plot_axvline_at_change, panel_FR_with_delay, hist_delays
+from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 #===============================================================================
 # CONSTANTS
 #===============================================================================
 figsize = (17.6*cm, 15*cm)
 
+    
+pre_FR = 5
+post_FR = 10
+
+bootstraps = 20
+samples_per_strap = 50
+    
 
 #===============================================================================
 # MAIN METHOD
 #===============================================================================
 def main():
-    control, params = load_config()
+    control, params = load_config(no_stim=True)
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
     
     
     fig = plt.figure(figsize=figsize)
@@ -69,16 +77,8 @@ def main():
     all_metrics = []
     all_rates = []
     
-    pre_FR = 5
-    post_FR = 10
-    
-    bootstraps = 20
-    samples_per_strap = 50
-    
-    hist_binwidth = 2.
-    
     means = [220., 320.]
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for tag in (mean_tag, std_tag, mean_std_tag):
         # for tag in (std_tag, ):
             for m, mean in enumerate(means):
@@ -120,7 +120,7 @@ def main():
     axt = ax.twinx()   
     axt.set(**axt_kwargs)
     plot_axvline_at_change(params, control, ax)
-    panel_FR_with_delay(means[0], df_rates, t_bins, ax)
+    plot_FRs(means[0], df_rates, t_bins, ax)
     hist_delays(means[0], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
     ax.legend()
     
@@ -130,18 +130,18 @@ def main():
     axt.set(**axt_kwargs)
     ax.tick_params(labelleft=False)
     plot_axvline_at_change(params, control, ax)
-    panel_FR_with_delay(means[1], df_rates, t_bins, ax)
+    plot_FRs(means[1], df_rates, t_bins, ax)
     hist_delays(means[1], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
     ax.legend()
     #===============================================================================
     # PLOT -  INDIVIDUAL FR
     #===============================================================================
+    mean = means[0]
     all_rates = []
     t_bins = get_tbins(params)
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         # for tag in (mean_tag, std_tag, mean_std_tag):
         for tag in (std_tag, ):
-            logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
             rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
             run_ids = get_run_ids(rows, params, tag)
             
@@ -154,25 +154,35 @@ def main():
                 new_rows = pd.DataFrame(FRs) # Shape 1 x time
                 new_rows.index = pd.MultiIndex.from_product(
                     [[tag], [mean], [run_id]],
-                    names=["tag", "mean", "run_id"]
+                    names=["tag", "mean", "bootstrap_id"]
                 )
                 all_rates.append(new_rows)
     df_rates = pd.concat(all_rates)
     
     ax = fig.add_subplot(gs[1, 0])
     ax.set(**ax_kwargs)
-    sns.lineplot(
-        data=df_rates,
-        x="mean",
-        y="firstspike",
-        hue="tag",
-        marker="o",
-        errorbar=("se", 1.96), # 95% interval
-        estimator="mean",
-        hue_order=hue_order,
-        ax=ax,
-    )
-
+    plot_FRs(mean, df_rates, t_bins, ax, add_traces=True)
+    
+    # bin_center = (t_bins[:-1] + t_bins[1:]) / 2
+    #
+    # df = df_rates.xs(mean, level=("mean"))
+    # for tag, g in df.groupby(level="tag"):
+    #     # Set Colors & Labels
+    #     label = Label[tag]
+    #     color = Color[tag]
+    #
+    #     # Filter a potential "all" id:
+    #     gb = g[g.index.get_level_values("run_id") != "all"]
+    #
+    #     # g: rows = sims, cols = points
+    #     mu = gb.mean(axis=0)
+    #     std = gb.std(axis=0)
+    #
+    #     ax.plot(bin_center, df.T, alpha=0.05, color="grey", zorder=-10)
+    #
+    #     ax.plot(bin_center, mu, label=label, color=color)
+    #     ax.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
+        
     #===============================================================================
     # DATA -  TIME TO FIRST SPIKE
     #===============================================================================
@@ -181,7 +191,7 @@ def main():
     time_to_first_spike = []
     df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
     
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for tag in (mean_tag, std_tag, mean_std_tag):
             for m, mean in enumerate(means):
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)

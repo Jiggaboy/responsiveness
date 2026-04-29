@@ -26,7 +26,7 @@ from constants import Label, Color
 #===============================================================================
 
 
-def panel_FR_with_delay(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, **plot_kwargs):
+def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, add_traces:bool=False, **plot_kwargs):
     bin_center = (t_bins[:-1] + t_bins[1:]) / 2
     
     
@@ -47,12 +47,15 @@ def panel_FR_with_delay(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax
         mu = gb.mean(axis=0)
         std = gb.std(axis=0)
 
+        if add_traces:
+            ax.plot(bin_center, gb.T, alpha=0.05, color="grey", zorder=-10)
 
         ax.plot(bin_center, mu, label=label, color=color, **plot_kwargs)
         ax.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
         
         halved = mu.size // 2
         ax.axhline(mu[halved:].mean(), color=color, **plot_kwargs)
+        
     
 def hist_delays(mean:float, df_delays:pd.DataFrame, t_bins:np.ndarray, ax:object, t_start:float=0.):
     

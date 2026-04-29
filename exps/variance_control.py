@@ -92,7 +92,7 @@ means = np.arange(220, 320+1, 140.)
 #     for h, hist_binwidth in enumerate((1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6)):
 #         params.hist_binwidth = hist_binwidth
 #         t_bins = get_tbins(params)
-#         index = (t_bins >= t_start).argmax() # Gets first value that is larger than t_start
+#         index = (t_bins >= t_start).argmax() - 1 # Gets first value that is larger than t_start
 #
 #         plt.plot(t_bins, marker=".")
 #         plt.scatter(index, t_bins[index], marker=h)
@@ -101,6 +101,9 @@ means = np.arange(220, 320+1, 140.)
 
 def main():
     control, params = load_config(is_network=is_network)
+    
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    params.filename = base_filename + f"_{pre_FR}_{post_FR}" + f".{suffix}"
     
     with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
