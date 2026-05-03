@@ -16,6 +16,9 @@ __version__ = '0.1b'
 from cflogger import logger
 
 import nest
+nest.set_verbosity("M_WARNING")
+nest.print_time = True
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as  mpatches
@@ -42,19 +45,20 @@ from constants import mean_tag, std_tag, mean_std_tag
 from config import load_config
 control, params = load_config(is_network=True)
 
-Imean_ext   = 280.
+Imean_ext   = 260.
 means = [260., ]
 means = [260., 300.,]
-means = np.arange(220, 320+1, 10.)
+means = np.arange(220, 320+1, 40.)
 
 pre_FR = 2 # for E and I
 post_FR = 4
+post_FR = 6
 
-# pre_FR = 5 # for E and I
-# post_FR = 10
+pre_FR = 5 # for E and I
+post_FR = 10
 FR_I = pre_FR
 
-seeds = np.arange(60, dtype=int)
+seeds = np.arange(25, dtype=int)
 #===============================================================================
 # MAIN METHOD
 #===============================================================================
@@ -67,7 +71,10 @@ def main():
     #===============================================================================
     # EXPERIMENT  - Simulation with delta for the E population
     #===============================================================================
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+    
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         pre_Emeans = np.zeros(len(means))
         post_Emeans = np.zeros(len(means))
         pre_Estds = np.zeros(len(means))
@@ -161,7 +168,6 @@ def main():
             # SIMULATE
             for m, mean in enumerate(means):
                 for seed in seeds:
-                    # TODO: Add condition here for stimulus, break, and duration.
                     if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
                                                            pre_mean=pre_Emeans[m], post_mean=post_Emeans[m],
                                                            pre_std=pre_Estds[m], post_std=post_Estds[m], seed=seed,
@@ -323,7 +329,10 @@ def simulate(params:object, control:object,
 
 #===============================================================================
 if __name__ == '__main__':
-    main()
     from lib.util import play_beep
-    play_beep()
+    play_beep(repeat=1)
+    main()
+    play_beep(pause = 0.5)
+    import time
+    time.sleep(1)
     plt.show()

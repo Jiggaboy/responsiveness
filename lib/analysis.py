@@ -27,6 +27,7 @@ from lib.util import functimer
 
 from lib.responsehdf5 import load_and_merge_spikes
 from lib.conversion import spikecount_to_FR
+from lib.responsehdf5 import inh_tag
 
 #===============================================================================
 # CONSTANTS
@@ -125,6 +126,7 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
     # Time management    
     t_bins = get_tbins(params)
     t_start = get_tstart(params)
+    t_start = 500
     index = (t_bins >= t_start).argmax() - 1 # Gets first value that is larger than t_start
     
     delay_estimates = np.zeros(rep)
@@ -142,7 +144,8 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
         delay_estimates[b] = delay * params.hist_binwidth
                 
         # FIRING RATE
-        FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, params.hist_binwidth)
+        N = params.N // 4 if subgroup == inh_tag else params.N
+        FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), N, params.hist_binwidth)
         population_FR[b] = FRs
     return t_bins, delay_estimates, population_FR
 

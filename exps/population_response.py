@@ -50,7 +50,7 @@ from cplot.aux import plot_axvline_at_change
 #===============================================================================
 
 plot_rate_and_delays = True
-plot_rate_and_delays = False
+# plot_rate_and_delays = False
 
 plot_entropy_over_delay = True
 plot_entropy_over_delay = False
@@ -62,7 +62,7 @@ plot_time_to_first_spike = True
 plot_time_to_first_spike = False
 
 plot_dist_first_and_second_spike = True
-# plot_dist_first_and_second_spike = False
+plot_dist_first_and_second_spike = False
 
 
 ylim_delay = (0, 75)
@@ -77,7 +77,7 @@ samples_per_strap =  50
 
 pre_FR  = 2.
 post_FR = 4.
-# post_FR = 6.
+post_FR = 6.
 
 pre_FR = 5.
 post_FR = 10.
@@ -91,7 +91,7 @@ post_FR = 10.
 # pre_FR = 10.
 # post_FR = 5.
 
-means = np.arange(240, 320+1, 40.)
+means = np.arange(240, 320+1, 120.)
 # means = np.arange(220, 320+1, 10.)
 
 
@@ -106,9 +106,7 @@ def main():
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
     tmp_filename = base_filename + f"_{pre_FR}_{post_FR}" + f".{suffix}"
     
-    
-
-    
+        
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # MORE METHODS
@@ -121,7 +119,7 @@ def main():
         for tag in (mean_tag, std_tag, mean_std_tag):
         # for tag in (std_tag, ):
             for m, mean in enumerate(means):
-                logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
+                logger.info(f"{tag}: Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                 run_ids = get_run_ids(rows, params, tag)
 
@@ -148,8 +146,8 @@ def main():
 
                 
                 t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
-    
-    
+                
+                
                 new_rows = pd.DataFrame({
                     # entropy_tag: entropies_pre,
                     delay_tag: delay_estimates,
@@ -159,7 +157,7 @@ def main():
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 all_metrics.append(new_rows)
-    
+                
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
@@ -211,9 +209,10 @@ def main():
                 std = gb.std(axis=0)
     
     
-                ax1.plot(bin_center, mu, label=label, color=color)
-                ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
-                
+                ax1.plot(bin_center, gb.T, color=color)
+                ax1.plot(bin_center, mu, label=label, color="k")
+                ax1.fill_between(bin_center, mu+std, mu-std, color="k", alpha=0.25, zorder=5)
+                # break
                 halved = mu.size // 2
                 ax1.axhline(mu[halved:].mean(), color=color)
     
@@ -525,44 +524,47 @@ def main():
         
         # save_figure(figname_spike, fig)
             
-        pre_means = np.zeros(len(means))
-        post_means = np.zeros(len(means))
-        pre_stds = np.zeros(len(means))
-        post_stds = np.zeros(len(means))
-        # for delta in (mean_tag, ):
-        fig, axes = plt.subplots(nrows=2)
-        for delta in (mean_tag, std_tag, mean_std_tag):
-            for m, mean in enumerate(means):
-                pre_means[m] = mean
-                pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=params.dt).root, 2)
-                pre_stds[m] = pre_std
-
-                if delta == mean_tag:
-                    post_means[m] = round(siegert.find_parameter(pre_std, target_FR=post_FR, given_parameter=std_tag, dt=params.dt).root, 2) # ie delta mean
-                    post_stds[m] = pre_std
-                elif delta == std_tag:
-                    post_means[m] = mean
-                    post_stds[m] = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2) # ie delta std
-                elif delta == mean_std_tag:
-                    post_std = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2)
-                    post_stds[m] = pre_std + (post_std - pre_std) / 2
-                    post_mean  = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=params.dt, given_parameter=std_tag).root, 2)
-                    post_means[m] = mean + (post_mean - mean) / 2
-                else:
-                    raise ValueError("No valid delta chosen")
+    # pre_means = np.zeros(len(means))
+    # post_means = np.zeros(len(means))
+    # pre_stds = np.zeros(len(means))
+    # post_stds = np.zeros(len(means))
+    # # for delta in (mean_tag, ):
+    # fig, axes = plt.subplots(nrows=2)
+    # for delta in (mean_tag, std_tag, mean_std_tag):
+    #     for m, mean in enumerate(means):
+    #         pre_means[m] = mean
+    #         pre_std = round(siegert.find_parameter(mean, target_FR=pre_FR, dt=params.dt).root, 2)
+    #         pre_stds[m] = pre_std
+    #
+    #         if delta == mean_tag:
+    #             post_means[m] = round(siegert.find_parameter(pre_std, target_FR=post_FR, given_parameter=std_tag, dt=params.dt).root, 2) # ie delta mean
+    #             post_stds[m] = pre_std
+    #         elif delta == std_tag:
+    #             post_means[m] = mean
+    #             post_stds[m] = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2) # ie delta std
+    #         elif delta == mean_std_tag:
+    #             post_std = round(siegert.find_parameter(mean, target_FR=post_FR, dt=params.dt).root, 2)
+    #             post_stds[m] = pre_std + (post_std - pre_std) / 2
+    #             post_mean  = round(siegert.find_parameter(pre_std, target_FR=post_FR, dt=params.dt, given_parameter=std_tag).root, 2)
+    #             post_means[m] = mean + (post_mean - mean) / 2
+    #         else:
+    #             raise ValueError("No valid delta chosen")
+    #
+    #     if delta == mean_tag:
+    #         ls = "solid"
+    #         marker = "o"
+    #     elif delta == std_tag:
+    #         ls = "dashed"
+    #         marker = ">"
+    #     else:
+    #         ls = "dotted"
+    #         marker = "x"
+    #
+    #     axes[0].plot(pre_means, pre_stds, marker=marker, ls=ls)
+    #     axes[0].plot(post_means, post_stds, marker=marker, ls=ls)
         
-            if delta == mean_tag:
-                ls = "solid"
-            elif delta == std_tag:
-                ls = "dashed"
-            else:
-                ls = "dotted"
-        
-            axes[0].plot(pre_means, pre_stds, marker="o", ls=ls)
-            axes[0].plot(post_means, post_stds, marker=">", ls=ls)
-            
-            axes[1].plot(pre_means, post_means/pre_means, marker="o", ls=ls)
-            axes[1].plot(pre_means, post_stds /pre_stds, marker="x", ls=ls)
+        axes[1].plot(pre_means, post_means/pre_means, marker="o", ls=ls)
+        axes[1].plot(pre_means, post_stds /pre_stds, marker="x", ls=ls)
         
 
     #===============================================================================

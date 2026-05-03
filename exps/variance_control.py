@@ -45,7 +45,7 @@ from lib.conversion import spikecount_to_FR
 #===============================================================================
 
 is_network = True
-is_network = False
+# is_network = False
 
 plot_rate_and_delays = True
 plot_rate_and_delays = False
@@ -58,14 +58,14 @@ ylim_delay = (0, 125)
 # CONSTANTS
 #===============================================================================
 bootstraps        = 100
-samples_per_strap =  50
+samples_per_strap =  15 if is_network else 100
 
     
 pre_FR = 2.
 post_FR = 4.
 
-# pre_FR = 5.
-# post_FR = 10.
+pre_FR = 5.
+post_FR = 10.
 
 # pre_FR = 4.
 # # # post_FR = 6.
@@ -73,7 +73,7 @@ post_FR = 4.
 #
 # pre_FR = 10.
 # post_FR = 5.
-means = np.arange(220, 320+1, 140.)
+means = np.arange(220, 320+1, 40.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.)
 
@@ -103,9 +103,9 @@ def main():
     control, params = load_config(is_network=is_network)
     
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    params.filename = base_filename + f"_{pre_FR}_{post_FR}" + f".{suffix}"
+    tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
     
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         #===============================================================================
         # MORE METHODS
         #===============================================================================    

@@ -62,6 +62,10 @@ class Params:
     poisson_filename: str = "poisson.hdf5"
     
     def __post_init__(self):
+        if not self.control.brief_stimulus:
+            self.stim_duration = 0.
+            self.break_duration = 0.
+            self.stim_reps = 0
         filename = self.filename
 
 
@@ -75,9 +79,6 @@ class Params:
     def filename(self):
         c = self.control
         if not c.brief_stimulus:
-            self.stim_duration = 0.
-            self.break_duration = 0.
-            self.stim_reps = 0
             filename        = "sim_data.hdf5"
         elif c.brief_stimulus:
             self.stim_duration = np.round(self.stim_duration)
@@ -98,17 +99,17 @@ class Params:
 class NetworkParams(Params):    
     # Target-Source notation
     # Indegree definition
-    C_EE: int               = 100
-    C_EI: int               = 200
-    C_IE: int               = 200
+    C_EE: int               = 400
+    C_EI: int               = 400
+    C_IE: int               = 100
     C_II: int               = 100
     
-    J = 0.01
+    J = 0.025
     g = 8
     
     def __post_init__(self):
         super().__post_init__()
-        self.N = 2500
+        self.N = 5000
         
         
     @property

@@ -41,7 +41,7 @@ figsize = (17.6*cm, 15*cm)
 force = False
 # force = True
 
-ylim_delay = (0, 70)
+ylim_delay = (0, 80)
 marker_up = "^"
 marker_down = "v"
 marker = (marker_up, marker_down)
@@ -66,7 +66,7 @@ samples_per_strap = 50
     
 
 means = np.asarray([220., 260., 300.])
-# means = np.arange(220, 320+1, 20.)
+means = np.arange(220, 320+1, 20.)
 
 
 plot_mean = 220.
@@ -371,24 +371,24 @@ def main():
         #===============================================================================
         # PLOTS - Single Up - VIOLIN
         #===============================================================================
-        pre_FR = pre_FR_up
-        post_FR = post_FR_up
-        ax_violin = fig.add_subplot(gs[s+1, 1])
-        title = f"Delay estimates\n(FR: {pre_FR} to {post_FR})"
-    
-        ax_violin.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay, title=title)
-        ax_violin.set_xticks(ticks=np.arange(len(means)), labels=means)
-        
-        df_tmp = df_bwdelays.xs((pre_FR, post_FR, stim_rep, stim_duration), level=("pre_FR", "post_FR", "stim_reps", "stim_duration"))
-        sns.violinplot(df_tmp, x="mean", y="delay", hue="tag", 
-                       cut=0, density_norm="width", common_norm=True, 
-                       hue_order=hue_order, ax=ax_violin, native_scale=True,)
+        # pre_FR = pre_FR_up
+        # post_FR = post_FR_up
+        # ax_violin = fig.add_subplot(gs[s+1, 1])
+        # title = f"Delay estimates\n(FR: {pre_FR} to {post_FR})"
+        #
+        # ax_violin.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay, title=title)
+        # ax_violin.set_xticks(ticks=np.arange(len(means)), labels=means)
+        #
+        # df_tmp = df_bwdelays.xs((pre_FR, post_FR, stim_rep, stim_duration), level=("pre_FR", "post_FR", "stim_reps", "stim_duration"))
+        # sns.violinplot(df_tmp, x="mean", y="delay", hue="tag", 
+        #                cut=0, density_norm="width", common_norm=True, 
+        #                hue_order=hue_order, ax=ax_violin, native_scale=True,)
 
 
         #===============================================================================
         # PLOTS - Single Up - MEANS across 
         #===============================================================================
-        ax = fig.add_subplot(gs[s+1, 2])
+        ax = fig.add_subplot(gs[s+1, 1:])
         ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay)
         
         # for idx, (stim_duration, mark) in enumerate(zip(stim_durations, duration_marker)):
