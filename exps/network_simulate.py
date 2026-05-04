@@ -48,7 +48,7 @@ control, params = load_config(is_network=True)
 Imean_ext   = 260.
 means = [260., ]
 means = [260., 300.,]
-means = np.arange(220, 320+1, 40.)
+means = np.arange(220, 320+1, 140.)
 
 pre_FR = 2 # for E and I
 post_FR = 4
@@ -56,6 +56,7 @@ post_FR = 6
 
 pre_FR = 5 # for E and I
 post_FR = 10
+# post_FR = 12
 FR_I = pre_FR
 
 seeds = np.arange(25, dtype=int)

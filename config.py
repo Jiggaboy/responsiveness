@@ -104,7 +104,7 @@ class NetworkParams(Params):
     C_IE: int               = 100
     C_II: int               = 100
     
-    J = 0.025
+    J = 0.075
     g = 8
     
     def __post_init__(self):
@@ -114,24 +114,21 @@ class NetworkParams(Params):
         
     @property
     def filename(self):
-        c = self.control
-        if not c.brief_stimulus:
-            filename        = "network.hdf5"
-        elif c.brief_stimulus:
+        filename        = "network"
+        filename = filename + f"_J_{self.J}"
+        if self.control.brief_stimulus:
             self.stim_duration = np.round(self.stim_duration)
-            filename        = f"network_stim_{self.stim_duration}.hdf5"
-        else:
-            raise ValueError("Invalid arguments")
+            filename        = filename + f"_stim_{self.stim_duration}"
     
             
-        if c.test:
+        if self.control.test:
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
             filename = "test_" + filename
             
         logger.info(f"Filename: {filename}") 
-        return filename
+        return filename + ".hdf5"
         
     @property
     def metadata(self):

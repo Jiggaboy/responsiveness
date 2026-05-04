@@ -126,7 +126,6 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
     # Time management    
     t_bins = get_tbins(params)
     t_start = get_tstart(params)
-    t_start = 500
     index = (t_bins >= t_start).argmax() - 1 # Gets first value that is larger than t_start
     
     delay_estimates = np.zeros(rep)
