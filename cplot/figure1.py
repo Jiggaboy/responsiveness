@@ -22,20 +22,24 @@ import pandas as pd
 import seaborn as sns
 
 from config import load_config
-from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order, KTH_sky, KTH_blue, KTH_navy, KTH_grey
 
 from lib.analysis import bootstrap, get_tbins
 from lib.conversion import spikecount_to_FR
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
+from lib.util import save_figure
 
 from cplot.constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
+
+
+plt.rcParams["lines.linewidth"] = 1
 #===============================================================================
 # CONSTANTS
 #===============================================================================
 figsize = (17.6*cm, 15*cm)
-
+fname = "figure1_response_kernels"
     
 pre_FR = 5
 post_FR = 10
@@ -54,30 +58,33 @@ def main():
     
     
     fig = plt.figure(figsize=figsize)
-    gs = fig.add_gridspec(nrows=2, ncols=3) #width_ratios=()
+    gs = fig.add_gridspec(nrows=3, ncols=3) #width_ratios=()
     fig.subplots_adjust(
-        # left=0.06,
-        # right=0.95,
-        # bottom=0.1,
-        # top=0.93,
-        # wspace=0.2,
-        # hspace=0.3
+        left=0.06,
+        right=0.96,
+        bottom=0.06,
+        top=0.94,
+        wspace=0.25,
+        hspace=0.6
     )
     
     ### Schematic
-    ax = fig.add_subplot(gs[0, 0])
-    ax.set(xlabel="Time [ms]", ylabel="FR [Hz]", ylim=(0, 3))
-    ax.set_yticks([0, 1, 2], [0, r"$FR_{pre}$", r"$FR_{post}$"])
+    ax = fig.add_subplot(gs[0, 2])
+    ax.set(xlabel="Time [ms]", ylabel="FR [Hz]", ylim=(0.4, 3), xlim=(0, 65), title="Response Kernels")
+    ax.set_yticks([1, 2], [r"$FR_{pre}$", r"$FR_{post}$"])
+    xticks = np.arange(0, 60+1, 20)
+    xlabels = list(xticks)
+    xlabels[1] = r"$t_\Delta$"
+    ax.set_xticks(xticks, xlabels)
     panel_schematic(ax)
     ax.legend()
-
 
     ### Example trace 1
     # How to get all the data we need?
     all_metrics = []
     all_rates = []
     
-    means = [220., 320.]
+    means = [240., 280., 320.]
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for tag in (mean_tag, std_tag, mean_std_tag):
         # for tag in (std_tag, ):
@@ -86,9 +93,9 @@ def main():
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                 run_ids = get_run_ids(rows, params, tag)
                 t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
-        
-        
-        
+    
+    
+    
                 new_rows = pd.DataFrame({delay_tag: delay_estimates,})
                 new_rows.index = pd.MultiIndex.from_product(
                     [[tag], [mean], range(len(delay_estimates))],
@@ -109,30 +116,56 @@ def main():
         
     ax_kwargs = {
         "xlabel": "Time [ms]", "ylabel": "FR [Hz]", "ylim": (0, 21),
-        "xlim": (params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125),
+        "xlim": (params.warmup + params.duration_pre - 20, params.warmup + params.duration_pre + 100),
     }    
     axt_kwargs = {
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
     }
     
-    ax = fig.add_subplot(gs[0, 1])
-    ax.set(**ax_kwargs)
-    axt = ax.twinx()   
-    axt.set(**axt_kwargs)
-    plot_axvline_at_change(params, control, ax)
-    plot_FRs(means[0], df_rates, t_bins, ax)
-    hist_delays(means[0], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
-    ax.legend()
     
-    ax = fig.add_subplot(gs[0, 2])
-    ax.set(**ax_kwargs)
-    axt = ax.twinx()   
-    axt.set(**axt_kwargs)
-    ax.tick_params(labelleft=False)
-    plot_axvline_at_change(params, control, ax)
-    plot_FRs(means[1], df_rates, t_bins, ax)
-    hist_delays(means[1], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
-    ax.legend()
+    for m, mean in enumerate(means):
+        ax = fig.add_subplot(gs[1, m])
+        if m == 0:
+            ax.set(title=r"$\mu_{pre}$" + f"={int(mean)}mA", **ax_kwargs)
+        else:
+            ax_kwargs_tmp = dict(ax_kwargs)
+            ax_kwargs_tmp.pop("ylabel", None)
+            ax.set(title=r"$\mu_{pre}$" + f"={int(mean)}mA", **ax_kwargs_tmp)
+            ax.tick_params(labelleft=False)
+
+        
+        plot_axvline_at_change(params, control, ax)
+        plot_FRs(mean, df_rates, t_bins, ax)
+        
+        # axt = ax.twinx()   
+        # axt.set(**axt_kwargs)
+        # hist_delays(mean, df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
+        if m == 1:
+            ax.legend()
+    #
+    # ax = fig.add_subplot(gs[0, 2])
+    # ax.set(**ax_kwargs)
+    # ax.tick_params(labelleft=False)
+    # plot_axvline_at_change(params, control, ax)
+    # plot_FRs(means[1], df_rates, t_bins, ax)
+    #
+    # # axt = ax.twinx()   
+    # # axt.set(**axt_kwargs)
+    # # hist_delays(means[1], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
+    #
+    # ax.legend()
+    #
+    # ax = fig.add_subplot(gs[0, 2])
+    # ax.set(**ax_kwargs)
+    # ax.tick_params(labelleft=False)
+    # plot_axvline_at_change(params, control, ax)
+    # plot_FRs(means[1], df_rates, t_bins, ax)
+    #
+    # # axt = ax.twinx()   
+    # # axt.set(**axt_kwargs)
+    # # hist_delays(means[1], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
+    #
+    # ax.legend()
     #===============================================================================
     # PLOT -  INDIVIDUAL FR
     #===============================================================================
@@ -159,8 +192,8 @@ def main():
                 all_rates.append(new_rows)
     df_rates = pd.concat(all_rates)
     
-    ax = fig.add_subplot(gs[1, 0])
-    ax.set(**ax_kwargs)
+    ax = fig.add_subplot(gs[2, 0])
+    ax.set(title="Ind. Traces", **ax_kwargs)
     plot_FRs(mean, df_rates, t_bins, ax, add_traces=True)
     
     # bin_center = (t_bins[:-1] + t_bins[1:]) / 2
@@ -186,7 +219,7 @@ def main():
     #===============================================================================
     # DATA -  TIME TO FIRST SPIKE
     #===============================================================================
-    means = np.arange(220, 320+1, 40)
+    means = np.arange(220, 320+1, 10)
     
     time_to_first_spike = []
     df = pd.DataFrame(columns=["firstspike", "tag", "mean"])
@@ -229,24 +262,30 @@ def main():
     #===============================================================================
     # PLOT -  TIME TO FIRST SPIKE
     #===============================================================================
-    ax = fig.add_subplot(gs[1, 1])
-    ax.set(xlabel=r"mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", title=f"Time to first spike\n(FR: {pre_FR} to {post_FR})")
+    ax = fig.add_subplot(gs[2, 1])
+    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", title=f"Time to First Spike\nDistribution")
+    ax.set_ylim(-5, 150)
 
-    sns.violinplot(df, x="mean", y="firstspike", hue="tag", 
+    df_tmp = df[df.index.isin([240, 280, 320], level="mean")] - (params.warmup + params.duration_pre)
+    sns.violinplot(df_tmp, x="mean", y="firstspike", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
-                       hue_order=hue_order, ax=ax)
+                       inner=None,
+                       hue_order=hue_order, ax=ax,
+            palette=Color,
+            legend=False,
+            )
     
-    handles = []
-    for tag in hue_order:
-        handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
-    ax.legend(handles=handles)
+    # handles = []
+    # for tag in hue_order:
+    #     handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
+    # ax.legend(handles=handles)
         
     
-    ax = fig.add_subplot(gs[1, 2])
-    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]")
+    ax = fig.add_subplot(gs[2, 2])
+    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", ylim=(25, 87), xticks=(means[::4]), title="Time to First Spike")
         
     sns.lineplot(
-        data=df,
+        data=df - (params.warmup + params.duration_pre),
         x="mean",
         y="firstspike",
         hue="tag",
@@ -255,9 +294,10 @@ def main():
         estimator="mean",
         hue_order=hue_order,
         ax=ax,
+        palette=Color,
     )
     sns.lineplot(
-        data=df,
+        data=df - (params.warmup + params.duration_pre),
         x="mean",
         y="firstspike",
         hue="tag",
@@ -268,14 +308,18 @@ def main():
         estimator="median",
         hue_order=hue_order,
         ax=ax,
+        palette=Color,
     )
     labels = []
     for stat in ("mean", "median"):
         for tag in hue_order:
-            labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+            labels.append(rf"{stat.capitalize()}")
+            # labels.append(rf"{stat.capitalize()} ({Label[tag]})")
     handles, _ = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
+    ax.legend(handles, labels, ncols=2, handlelength=3)
 
+
+    save_figure(fname, fig, is_latex=True)
 
 #===============================================================================
 # METHODS
@@ -284,11 +328,11 @@ def panel_schematic(ax:object):
     dt = 0.1
     t_split = 20
     tau = 10
-    f = 100e-3
+    f = 50e-3
     offset = 1
     
     t_pre  = np.arange(0, t_split, dt)
-    t_post = np.arange(t_split, 100, dt)
+    t_post = np.arange(t_split, 80, dt)
     t = np.concatenate([t_pre, t_post])
 
     t_decay = t_post - t_split
@@ -297,15 +341,16 @@ def panel_schematic(ax:object):
     undershoot[-t_post.size:] = 1 - exp_decay(t_decay, tau)
     
     overshoot = np.zeros(t_pre.size + t_post.size, dtype=float)
-    overshoot[-t_post.size:] = 0.5 * (t_post - t_split) * exp_decay(t_decay, 5) + 1 - exp_decay(t_decay)
+    overshoot[-t_post.size:] = 0.25 * (t_post - t_split) * exp_decay(t_decay, 5) + 1 - exp_decay(t_decay)
     
     damped_osc = np.zeros(t_pre.size + t_post.size, dtype=float)
-    damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay)
+    damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * 2 * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay, 2)
+    # damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay)
     
-    
-    ax.plot(t, undershoot + offset, color=Color[std_tag], label="undershoot") 
-    ax.plot(t, overshoot + offset, color=Color[mean_tag], label="overshoot") 
-    ax.plot(t, damped_osc + offset, color=Color[mean_std_tag], label="damped osc.")
+    ax.plot(t, undershoot + offset, color=KTH_sky, label="undershoot", zorder=10) 
+    ax.plot(t, overshoot + offset, color=KTH_blue, label="overshoot", zorder=20, alpha=0.75) 
+    ax.plot(t, damped_osc + offset, color=KTH_navy, label="damped osc.", zorder=15)
+    ax.axvline(t_split, c=KTH_grey, ls="--")
     
 def exp_decay(t:np.ndarray, tau:float=1):
     return np.exp(-t / tau)

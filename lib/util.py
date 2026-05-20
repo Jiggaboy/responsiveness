@@ -24,14 +24,14 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import tables as tb
-from pathlib import PurePosixPath
+from pathlib import PosixPath, PurePosixPath
 
 from functools import wraps, partial
 from time import perf_counter
 
 from pathlib import Path
 
-from constants import DATA_DIR, FIGURE_DIR, FIGURE_SUFFIX, FIGURE_ALTERNATIVE_SUFFIX
+from constants import DATA_DIR, FIGURE_DIR, LATEXFIGURE_DIR, FIGURE_SUFFIX, FIGURE_ALTERNATIVE_SUFFIX
 
 
 #===============================================================================
@@ -140,23 +140,28 @@ def replace_table_with_new_description(h5file:tb.file, table_path:str, new_descr
 # FIGURES
 #===============================================================================
 
-def save_figure(filename:str, figure:object, sub_directory:str=None, **kwargs):
+def save_figure(filename:str, figure:object, sub_directory:str=None, is_latex:bool=False, **kwargs):
     """
     Saves the figure-directory in the subdirectory.
     """
+    kwargs["dpi"] = kwargs.get("dpi", 600)
+    kwargs["transparent"] = kwargs.get("transparent", True)
+    
     if sub_directory:
         filename = prepend_dir(filename, sub_directory)
-    filename = prepend_dir(filename, FIGURE_DIR)
+    if is_latex:
+        filename = prepend_dir(filename, LATEXFIGURE_DIR)
+    else:
+        filename = prepend_dir(filename, FIGURE_DIR)
     mkdir(filename)
 
     figure.savefig(str(filename) + FIGURE_SUFFIX, **kwargs)
     figure.savefig(str(filename) + FIGURE_ALTERNATIVE_SUFFIX, **kwargs)
     
 
-def prepend_dir(filename: str | Path, directory: str | Path = DATA_DIR) -> Path:
-    filename = Path(filename)
-    directory = Path(directory)
-    return directory / filename
+def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
+    # Added in v0.1
+    return Path(directory).joinpath(filename)
 
 #===============================================================================
 # UTIL

@@ -51,8 +51,8 @@ class Params:
     warmup: float         = 100.
     duration_pre: float   = 400.
     duration_post: float  = 1000.
-    # stim_duration: float  = nif.tau #* 2
-    stim_duration: float  = nif.tau / 2
+    stim_duration: float  = nif.tau * 2
+    # stim_duration: float  = nif.tau / 2
     # break_duration: float = nif.tau * 0.5
     break_duration: float = 5.
     stim_reps: int        = 5
@@ -104,7 +104,7 @@ class NetworkParams(Params):
     C_IE: int               = 100
     C_II: int               = 100
     
-    J = 0.075
+    J = 0.025
     g = 8
     
     def __post_init__(self):

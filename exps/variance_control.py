@@ -45,7 +45,7 @@ from lib.conversion import spikecount_to_FR
 #===============================================================================
 
 is_network = True
-# is_network = False
+is_network = False
 
 plot_rate_and_delays = True
 plot_rate_and_delays = False
@@ -64,8 +64,8 @@ samples_per_strap =  15 if is_network else 100
 pre_FR = 2.
 post_FR = 4.
 
-pre_FR = 5.
-post_FR = 10.
+# pre_FR = 5.
+# post_FR = 10.
 
 # pre_FR = 4.
 # # # post_FR = 6.
@@ -74,7 +74,7 @@ post_FR = 10.
 # pre_FR = 10.
 # post_FR = 5.
 means = np.arange(220, 320+1, 40.)
-# means = np.arange(240, 290+1, 10.)
+means = np.arange(260, 290+1, 110.)
 # means = np.append(means, 320.)
 
 
@@ -135,6 +135,7 @@ def main():
                     
                     stds = population_FR[:, index_buffered:].std(axis=1, ddof=1)
                         
+                    plt.plot(population_FR.std(axis=0, ddof=1), c=Color[tag])
     
                     new_rows = pd.DataFrame({
                         "std": stds, "delay": delay_estimates,

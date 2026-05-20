@@ -70,7 +70,8 @@ post_FR = 10.
 
 # pre_FR = 4.
 # post_FR = 2.
-means = np.arange(200, 320+1, 10.)
+means = np.arange(220, 320+1, 40.)
+# means = np.asarray([-2.5, 35])
 # means = np.arange(260, 320+1, 120.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.

@@ -4,13 +4,14 @@
 History:
     - v0.1b: Add firstspike methods.
     - v0.2: Add StimRun as extension of Run.
+    - v0.2a: Remove prepend_dir and import instead from lib.util.
 """
 #===============================================================================
 # PROGRAM METADATA
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.2'
+__version__ = '0.2a'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -22,8 +23,7 @@ import datetime
 import tables as tb
 import numpy as np
 
-from pathlib import PosixPath, Path
-from lib.util import yes_no
+from lib.util import yes_no, prepend_dir
 
 from constants import mean_tag, std_tag, mean_std_tag
 
@@ -403,7 +403,8 @@ def get_run_ids(rows:np.ndarray, params:object, tag:str):
         mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
         rows_filtered = rows[mask]
     else:
-        raise ValueError("No valid tag given...")
+        rows_filtered = rows
+        logger.error("No valid tag given...")
     stim_mask = np.logical_and.reduce((rows_filtered["stim_duration"] == params.stim_duration,
         rows_filtered["break_duration"] == params.break_duration,
         rows_filtered["stim_reps"] == params.stim_reps))
@@ -412,9 +413,9 @@ def get_run_ids(rows:np.ndarray, params:object, tag:str):
     return run_ids
 
 
-def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
-    # Added in v0.1
-    return Path(directory).joinpath(filename)
+# def prepend_dir(filename: str, directory: str = DATA_DIR) -> PosixPath:
+#     # Added in v0.1
+#     return Path(directory).joinpath(filename)
 
 
 #===============================================================================

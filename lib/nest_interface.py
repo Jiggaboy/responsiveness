@@ -31,7 +31,7 @@ import nest
 #===============================================================================
 neuron_model = "iaf_psc_delta_ps"
 tau = 15.           # ms
-t_ref = 2.          # ms
+t_ref = .1          # ms
 E_L = 0.            # mV
 V_reset = 0.        # mV
 V_th = 20.          # mV

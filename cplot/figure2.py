@@ -24,9 +24,11 @@ import sklearn.neighbors as skn
 
 from config import load_config
 from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from constants import KTH_sky, KTH_blue, KTH_navy, KTH_grey
 
 from lib.analysis import bootstrap, get_tbins, get_response_kernels, get_response_kernel
-from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
+from lib.responsehdf5 import ResponseHdf5, get_run_ids
+from lib.util import save_figure
 
 from cplot.constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
@@ -35,7 +37,11 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 # CONSTANTS
 #===============================================================================
 figsize = (17.6*cm, 15*cm)
+fname = "figure2_recovery"
+
+
 ylim_delay = (0, 80)
+FR_lim = (0, 12)
 
 force = False
 # force = True
@@ -55,7 +61,7 @@ means = np.asarray([220., 260., 300.])
 means = np.arange(220, 320+1, 20.)
 
 plot_means = np.asarray([280., 260., 300.])
-FRs_to_plot = np.asarray([3., 4., 5.])
+FRs_to_plot = np.asarray([4., 6., 8.])
 # FRs_to_plot = np.asarray([6., 10., 12.])
 
 
@@ -69,6 +75,7 @@ fn_delay = "dfdelay" + fn_id
 #===============================================================================
 def main():
     control, params = load_config()
+    xlim_time = (params.warmup + params.duration_pre - 20, params.warmup + params.duration_pre + 100)
     
     metadata = {
         "post_FRs": post_FRs,
@@ -160,89 +167,90 @@ def main():
     fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(nrows=3, ncols=3) #width_ratios=()
     fig.subplots_adjust(
-        # left=0.06,
-        # right=0.95,
-        # bottom=0.1,
-        # top=0.93,
-        # wspace=0.2,
-        # hspace=0.3
+        left=0.06,
+        right=0.96,
+        bottom=0.08,
+        top=0.93,
+        wspace=0.25,
+        hspace=0.5
     )
     
     #===============================================================================
     # PLOTS - Row 1: Firing rates across means and post FRs
     #===============================================================================
     ax_kwargs = {
-        "xlabel": "Time [ms]", "ylabel": "FR [Hz]", "ylim": (0, 16),
-        "xlim": (params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125),
+        "xlabel": "Time [ms]", "ylabel": "FR [Hz]", "ylim": FR_lim,
+        "xlim": xlim_time,
+        "yticks": np.arange(*FR_lim, 2),
     }    
     axt_kwargs = {
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
     }
     
     plot_kwargs = {"markersize": 2}
-    ax = fig.add_subplot(gs[0, 0])
-    ax.set(**ax_kwargs)
-    axt = ax.twinx()   
-    axt.set(**axt_kwargs)
-    plot_axvline_at_change(params, control, ax)
-    df_tmp = df_rates.xs(FRs_to_plot[0], level="post_FR")
-    plot_FRs(plot_means[0], df_tmp, t_bins, ax, marker="o", **plot_kwargs)
+    for i, fr in enumerate(FRs_to_plot):
+        ax = fig.add_subplot(gs[0, i])
+        title = f"Activity over Time\n(FR: {pre_FR}Hz" + r"$\rightarrow$" + f"{fr}Hz)"
+        if i == 0:
+            ax.set(title=title, **ax_kwargs)
+        else:
+            ax_kwargs_tmp = dict(ax_kwargs)
+            ax_kwargs_tmp.pop("ylabel", None)
+            ax.set(title=title, **ax_kwargs_tmp)
+            ax.tick_params(labelleft=False)
+            
+        plot_axvline_at_change(params, control, ax)
+        df_tmp = df_rates.xs(FRs_to_plot[i], level="post_FR")
+        plot_FRs(plot_means[0], df_tmp, t_bins, ax, **plot_kwargs)
+        
+        ax.set_xlim(ax_kwargs["xlim"])
+    
+        if i == 1:
+            ax.legend()
+    
+    # axt = ax.twinx()   
+    # axt.set(**axt_kwargs)
     # hist_delays(plot_means[0], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
-    ax.legend()
     # plot_FRs(plot_means[1], df_tmp, t_bins, ax, marker="*", **plot_kwargs)
     # plot_FRs(plot_means[2], df_tmp, t_bins, ax, marker="^", **plot_kwargs)
     
-    ax = fig.add_subplot(gs[0, 1])
-    ax.set(**ax_kwargs)
-    axt = ax.twinx()   
-    axt.set(**axt_kwargs)
-    plot_axvline_at_change(params, control, ax)
-    df_tmp = df_rates.xs(FRs_to_plot[1], level="post_FR")
-    plot_FRs(plot_means[0], df_tmp, t_bins, ax, marker="o", **plot_kwargs)
-    # hist_delays(plot_means[0], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
-    ax.legend()
-    # plot_FRs(plot_means[1], df_tmp, t_bins, ax, marker="*", **plot_kwargs)
-    # plot_FRs(plot_means[2], df_tmp, t_bins, ax, marker="^", **plot_kwargs)
-    
-    ax = fig.add_subplot(gs[0, 2])
-    ax.set(**ax_kwargs)
-    axt = ax.twinx()   
-    axt.set(**axt_kwargs)
-    plot_axvline_at_change(params, control, ax)
-    df_tmp = df_rates.xs(FRs_to_plot[2], level="post_FR")
-    plot_FRs(plot_means[0], df_tmp, t_bins, ax, marker="o", **plot_kwargs)
-    # hist_delays(plot_means[0], df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
-    ax.legend()
-    # plot_FRs(plot_means[1], df_tmp, t_bins, ax, marker="*", **plot_kwargs)
-    # plot_FRs(plot_means[2], df_tmp, t_bins, ax, marker="^", **plot_kwargs)
 
     #===============================================================================
     # PLOTS - Row 2: Estimations of the transients
     #===============================================================================
     
-    ax_transient = fig.add_subplot(gs[1, 0])
+    gs_delays = gs[1:, :2].subgridspec(nrows=2, ncols=1,
+        wspace=0.3,
+        hspace=0.09,
+    )
+    
+    ax_transient = fig.add_subplot(gs_delays[0, 0])
     post_FR = FRs_to_plot[0]
-    title = f"Delay estimates\n(FR: {pre_FR} to {post_FR})"
+    title = f"Recover Time\n(FR: {pre_FR} to {post_FR})"
+    
+    xlabel = r"Mean drive $\mu_{pre}$"
+    ylabel = "Recovery Time [ms]"
 
-    ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay, title=title)
+    ax_transient.set(ylabel=ylabel, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
     df_tmp = df_delays.xs(post_FR, level="post_FR")
     sns.violinplot(df_tmp, x="mean", y="delay", hue="tag", 
                    cut=0, density_norm="width", common_norm=True, 
-                   hue_order=hue_order, ax=ax_transient, native_scale=True,)
+                   hue_order=hue_order, ax=ax_transient, native_scale=True,
+                   inner=None,
+                   palette=Color,
+    )
+    ax_transient.set(xlabel=None, xticks=means)
     
-    
-    # stats = df.groupby("category")["value"].agg(["mean", "median"]).reset_index()
-
-
     handles = []
     for tag in hue_order:
         handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
     plt.legend(handles=handles)
     
 
-    ax_mean_delay = fig.add_subplot(gs[2, 0])
-    ax_mean_delay.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay)
+    # ax_mean_delay = fig.add_subplot(gs[1, 0])
+    ax_mean_delay = fig.add_subplot(gs_delays[1, 0])
+    ax_mean_delay.set(xlabel=xlabel, ylabel=ylabel, ylim=ylim_delay)
 
     sns.lineplot(
         data=df_tmp,
@@ -254,6 +262,7 @@ def main():
         estimator="mean",
         hue_order=hue_order,
         ax=ax_mean_delay,
+        palette=Color,
     )
     sns.lineplot(
         data=df_tmp,
@@ -266,77 +275,44 @@ def main():
         estimator="median",
         hue_order=hue_order,
         ax=ax_mean_delay,
+        palette=Color,
     )
     
     labels = []
     for stat in ("mean", "median"):
         for tag in hue_order:
-            labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+            # labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
+            labels.append(rf"{stat.capitalize()}")
     handles, _ = ax_mean_delay.get_legend_handles_labels()
-    ax_mean_delay.legend(handles, labels, fontsize="x-small")
+    ax_mean_delay.legend(handles, labels, fontsize="small", ncols=2, handlelength=3)
     
-    
+
     #===============================================================================
     # PLOT: Delay over response kernel
     #===============================================================================
     
-    ax_transient = fig.add_subplot(gs[1:, 1])
-                    
-    avg_delay = (
-        df_delays["delay"]
-        .groupby(level=["tag", "mean", "post_FR"])
-        .mean()
-    )
-    idx = avg_delay.groupby(level=("tag", "post_FR")).idxmin()
-    out = avg_delay.loc[idx].reset_index(name="avg_delay")
-        
-        
-    for tag, rows in out.groupby("tag"):
-        for i in range(len(rows)-1):
-            ax_transient.plot(rows["mean"].iloc[i:i+1+1],
-                              rows["avg_delay"].iloc[i:i+1+1],
-                              alpha=rows["post_FR"].iloc[i:i+1+1].mean() / rows["post_FR"].max(),
-                              color=Color[tag], marker="*")
+    if True:
+        # ax_transient = fig.add_subplot(gs[1:, 1])
+        fig_trans, ax_transient = plt.subplots()
+                        
+        avg_delay = (
+            df_delays["delay"]
+            .groupby(level=["tag", "mean", "post_FR"])
+            .mean()
+        )
+        idx = avg_delay.groupby(level=("tag", "post_FR")).idxmin()
+        out = avg_delay.loc[idx].reset_index(name="avg_delay")
             
-        
-    # # Get minimum delay
-    # # for post_FR in post_FRs:
-    # for (tag, post_FR), gb in df_delays.groupby(level=("tag", "post_FR")):
-    #     delay_by_mean = gb.groupby(level="mean").mean()
-    #     min_delay = delay_by_mean["delay"].min()
-    #     min_mean  = delay_by_mean[delay_by_mean["delay"] == min_delay]
-    #     min_mean  = min_mean.index.to_numpy()
-    #
-    #
-    #     # # Get the corresponding response kernel
-    #     # df_tmp = df_rates
-    #     # # [overshoot, osc, undershoot]
-    #     # response_kernel = get_response_kernels(params, gb, delays)
-    #
-    #     for mean in min_mean:
-    #         df_tmp = df_rates.xs((tag, mean, post_FR), level=("tag", "mean", "post_FR"))
-    #         delays = df_delays.xs((tag, mean, post_FR), level=("tag", "mean", "post_FR"))["delay"]
-    #         # [overshoot, osc, undershoot]
-    #         response_kernel = get_response_kernels(params, df_tmp, delays, threshold=3)
-    #
-    #         fraction_overshoot = response_kernel[0] / response_kernel.sum()
-    #
-    #         plt.plot(mean + np.random.normal(scale=1, size=mean.size), fraction_overshoot + np.random.normal(scale=.05, size=mean.size),
-    #                   marker=f"${int(post_FR)}$", color=Color[tag])
-    #
-
             
-
-
-    # if tag == mean_tag:
-    #     ax = ax_response_mean
-    # elif tag == std_tag:
-    #     ax = ax_response_std
-    # elif tag == mean_std_tag:
-    #     ax = ax_response_both
-    # else:
-    #     raise ValueError
-
+        for tag, rows in out.groupby("tag"):
+            for i in range(len(rows)-1):
+                ax_transient.plot(rows["mean"].iloc[i:i+1+1],
+                                  rows["avg_delay"].iloc[i:i+1+1],
+                                  alpha=rows["post_FR"].iloc[i:i+1+1].mean() / rows["post_FR"].max(),
+                                  color=Color[tag], marker="*")
+                
+            
+    
     def compute(row):
         post_FR, tag, mean, bootstrap_id = row.name
         return get_response_kernel(
@@ -346,8 +322,6 @@ def main():
             threshold = 3,
         )
         
-    from time import perf_counter
-    before = perf_counter()
     df_delays[["over", "osc", "under"]] = df_rates.apply(
         compute,
         axis=1,
@@ -355,25 +329,35 @@ def main():
     )
     
     # ax_response = fig.add_subplot(gs[1:, 2])
-    gs_kernel = gs[1:, 2].subgridspec(nrows=3, ncols=1)
+    gs_kernel = gs[1:, 2].subgridspec(nrows=3, ncols=1, hspace=0.1)
     ax_response_mean = fig.add_subplot(gs_kernel[0])
     ax_response_std  = fig.add_subplot(gs_kernel[1])
     ax_response_both = fig.add_subplot(gs_kernel[2])
         
+    ax_kwargs = {"ylim": ylim_delay, "ylabel": ylabel, 
+                 "yticks": np.arange(ylim_delay[0], ylim_delay[1]+15, 20), 
+                 "xticks": means[::2]}
+    title = "Delay Estimates"
     for tag, gb in df_delays.groupby(level="tag"):
         if tag == mean_tag:
             ax = ax_response_mean
+            ax.tick_params(labelbottom=False)
+            ax.set(title=title)
         elif tag == std_tag:
             ax = ax_response_std
+            ax.tick_params(labelbottom=False)
         elif tag == mean_std_tag:
             ax = ax_response_both
+            ax.set_xlabel(xlabel)
         else:
             raise ValueError
+        ax.set(**ax_kwargs)
         
         under_tag = "under"
         over_tag  = "over"
         osc_tag   = "osc"
-        kcolor = {under_tag: "grey", over_tag: "purple", osc_tag: "yellow"}
+        kcolor = {under_tag: KTH_sky, over_tag: KTH_blue, osc_tag: KTH_navy}
+        kmarker = {under_tag: "v", over_tag: "^", osc_tag: "$\sim$"}
         for post_FR, gb_fr in gb.groupby(level=("post_FR")):
             gb_delay = gb_fr.groupby(level=("mean")).mean()
             values = gb_delay.reset_index()
@@ -384,69 +368,15 @@ def main():
             
             kernel_max = values[["over", "under", "osc"]].max(axis=1)
             kernel_max_idx = values[["over", "under", "osc"]].idxmax(axis=1)
-            ax.scatter(values["mean"], values["delay"],
-                        marker="o", alpha=kernel_max, c=kernel_max_idx.map(kcolor))
+            for idx, row in values.iterrows():
+                ax.scatter(row["mean"], row["delay"],
+                            marker=kmarker[kernel_max_idx[idx]],
+                            alpha=kernel_max[idx], c=kcolor[kernel_max_idx[idx]], s=10,
+                            zorder=10)
 
-        ##### DENSITY PLOTS
-        # under_tag = "under"
-        # over_tag  = "over"
-        # osc_tag   = "osc"
-        # kmaps = {under_tag: "Greys", over_tag: "Purples", osc_tag: "YlOrBr"}
-        # kcolor = {under_tag: "grey", over_tag: "purple", osc_tag: "yellow"}
-        # for ktyp in [under_tag, over_tag, osc_tag]:
-        #     values = gb_fr.reset_index()[["mean", "delay", ktyp]]
-        #     if not values[[ktyp]].any().item():
-        #         continue
-        #     sns.kdeplot(values, x="mean", y="delay", weights=values[[ktyp]].squeeze(), 
-        #                 bw_method=1,
-        #                 ax=ax, color=kcolor[ktyp], zorder=-8)
-    
-
-
-
-    
-    after = perf_counter()
-    print(f"Time elapsed: {after - before}")  
-    return
-    for (tag, post_FR, mean), gb in df_rates.groupby(level=("tag", "post_FR", "mean")):
-        gb_delay = df_delays.xs((tag, post_FR, mean), level=("tag", "post_FR", "mean"))
-        # for post_FR, gb in df_tmp.groupby(level=("post_FR")):
-        # for (tag, post_FR), gb in df.groupby(level=("tag", "post_FR")):
-        response_kernel = get_response_kernel(params, gb.iloc[0], gb_delay.iloc[0]["delay"], threshold=3)
-        df_rates
-        
-        
-        
-        response_kernel = get_response_kernels(params, gb, gb_delay["delay"], threshold=3)
-            
-        kernels.append(response_kernel / response_kernel.sum())
-        
-            
-        gb_delay = df_delays.xs((tag, post_FR), level=("tag", "post_FR"))
-        delay_by_mean = gb_delay.groupby(level="mean").mean()
-        
-        kernels = []
-        for mean, gbmean in gb.groupby(level="mean"):
-            delays = df_delays.xs((tag, mean, post_FR), level=("tag", "mean", "post_FR"))["delay"]
-
-            response_kernel = get_response_kernels(params, gbmean, delays, threshold=3)
-            
-            kernels.append(response_kernel / response_kernel.sum())
-        kernels = np.asarray(kernels)
-        
-        # Overshoot
-        kernel_density = skn.KernelDensity()
-        kernel_density.fit()
-        
-        ax.plot(delay_by_mean.index.get_level_values(level=0), delay_by_mean["delay"],
-                        color=Color[tag], alpha=post_FR / post_FRs.max())
             
             
-            
-            # ax_response.scatter(delay_by_mean.index.get_level_values(level=0), delay_by_mean["delay"], 
-            #                     marker="o", alpha=post_FR / post_FRs.max(), c=kernels)
-                
-            
+    save_figure(fname, fig, is_latex=True)
         
 #===============================================================================
 # METHODS

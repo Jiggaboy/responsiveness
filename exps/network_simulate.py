@@ -48,7 +48,7 @@ control, params = load_config(is_network=True)
 Imean_ext   = 260.
 means = [260., ]
 means = [260., 300.,]
-means = np.arange(220, 320+1, 140.)
+means = np.arange(220, 320+1, 40.)
 
 pre_FR = 2 # for E and I
 post_FR = 4
@@ -56,7 +56,6 @@ post_FR = 6
 
 pre_FR = 5 # for E and I
 post_FR = 10
-# post_FR = 12
 FR_I = pre_FR
 
 seeds = np.arange(25, dtype=int)
@@ -180,6 +179,7 @@ def main():
                     (Esenders, Espike_times), (Isenders, Ispike_times), _ = simulate(params, control,
                                                                  pre_Emeans[m], pre_Estds[m], post_Emeans[m], post_Estds[m],
                                                                  pre_Imeans[m], pre_Istds[m], post_Imeans[m], post_Istds[m],
+                                                                 seed=seed,
                                                                  )
                         
                     logger.info("Save simulation...")

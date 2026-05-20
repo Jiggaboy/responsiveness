@@ -69,12 +69,12 @@ post_FR = 10.
 # post_FR = 12.
 # pre_FR = 4.
 # post_FR = 2.
-means = [260, ]
+means = [220, ]
 means = np.arange(220, 320+1, 40.)
     
 
 bootstraps = 100     #50
-samples_per_strap = 10
+samples_per_strap = 20
 
 hue_order = [mean_tag, std_tag, mean_std_tag]
 ylim_delay = (0, 100)
@@ -102,6 +102,7 @@ def main():
         
         
         ##### ALL ANALYSES ######################################
+        # for tag in (mean_tag, ):
         for tag in (mean_tag, std_tag, mean_std_tag):
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
@@ -270,9 +271,9 @@ def main():
                 mu = gb.mean(axis=0)
                 std = gb.std(axis=0)
                 
-                ax1.plot(bin_center, gb.T, color=color, alpha=0.25)
-                ax1.plot(bin_center, mu, label=label, color="k")
-                ax1.fill_between(bin_center, mu+std, mu-std, color="k", alpha=0.25, zorder=5)
+                # ax1.plot(bin_center, gb.T, color=color, alpha=0.25)
+                ax1.plot(bin_center, mu, label=label, color=color)
+                ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.15, zorder=-5)
                 # break
                 # ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
         
@@ -312,10 +313,10 @@ def main():
         figname_transient = f"Delay estimates (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
         fig, ax_transient = plt.subplots(num=figname_transient)
         ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay,)
-        ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
+
         sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
-                       hue_order=hue_order, ax=ax_transient)
+                       hue_order=hue_order, ax=ax_transient, native_scale=True, )
         handles = []
         for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])

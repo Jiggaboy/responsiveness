@@ -56,7 +56,7 @@ plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-plot_transient_estimates = False
+# plot_transient_estimates = False
 
 plot_time_to_first_spike = True
 plot_time_to_first_spike = False
@@ -75,93 +75,80 @@ samples_per_strap =  50
 
 
 
-pre_FR  = 2.
-post_FR = 4.
-post_FR = 6.
-
 pre_FR = 5.
 post_FR = 10.
-#
-# pre_FR = 4.
-# # # # post_FR = 6.
-# post_FR = 8.
-# post_FR = 10.
-# post_FR = 12.
 
-# pre_FR = 10.
-# post_FR = 5.
+# Equivalent for network with J = 0.075
+pre_FR = 5.
+post_FR = 10.
+means = np.asarray([-2.5, 35])
 
-means = np.arange(220, 320+1, 40.)
-# means = np.arange(220, 320+1, 10.)
+pre_mean  = -2.5
+post_mean =  35
 
-# Equivalent for network with J=0.075
-# pre_FR = 5.
-# post_FR = 10.
-# means = np.asarray([-2.5, 35])
-# # Equivalent for network with J=0.075
-# pre_FR = 5.
-# post_FR = 10.
-# means = np.asarray([-2.5, 35])
+# Equivalent for network with J = 0.25
+# mean = 220
+pre_mean  = 132.5
+post_mean = 181
+# mean = 260
+pre_mean  = 132.5
+post_mean = 214
+# mean = 300
+# pre_mean  = 132.5
+# post_mean = 246
 
+# Equivalent for network with J = 0.25
+# mean = 220
+exp220 = {
+    mean_tag: (132.5, 145),
+    std_tag: (132.5, 181),
+    mean_std_tag: (132.5, 164),
+}
+# mean = 260
+exp260 = {
+    mean_tag: (172.5, 185),
+    std_tag: (172.5, 214),
+    mean_std_tag: (172.5, 199),
+}
+# mean = 300
+exp300 = {
+    mean_tag: (212.5, 225),
+    std_tag: (212.5, 246),
+    mean_std_tag: (212.5, 236),
+}
+
+
+exps = [exp220, exp260, exp300]
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
-@functimer  # .6s per seed (25 straps x 10 samples)
+@functimer 
 def main():
     control, params = load_config()
 
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    tmp_filename = base_filename + f"_{pre_FR}_{post_FR}" + f".{suffix}"
     
+    all_metrics = []
+    all_rates = []
+    all_runs_delays = []   
+    for exp in exps:
+        for tag, (pre_mean, post_mean) in exp.items():
+            tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
         
-    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
-        #===============================================================================
-        # MORE METHODS
-        #===============================================================================    
-        all_metrics = []
-        all_rates = []
-        all_runs_delays = []
-    
-        ##### ALL ANALYSES ######################################
-        for tag in (mean_tag, std_tag, mean_std_tag):
-        # for tag in (std_tag, ):
-            for m, mean in enumerate(means):
-                logger.info(f"{tag}: Run mean {mean} ({m+1} of {len(means)})...")
-                rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                run_ids = get_run_ids(rows, params, tag)
-
-    
-                # # DELAY ACROSS ALL RUNS
-                # spikecounts_all_runs = load_and_merge_spikes(hfile, run_ids, t_bins)
-                #
-                # SEM, delay_all_runs = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
-                #
-                # new_rows = pd.DataFrame({delay_tag: [delay_all_runs * params.hist_binwidth]})
-                # new_rows.index = pd.MultiIndex.from_tuples([(tag, mean)], names=["tag", "mean"])
-                # all_runs_delays.append(new_rows)
-                #
-                # FR_all_runs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0), params.N, params.hist_binwidth)
-                # plt.plot(t_bins[:-1], FR_all_runs)
-                # # Extend the array of firing rates
-                # new_rows = pd.DataFrame([FR_all_runs])
-                # new_rows.index = pd.MultiIndex.from_product(
-                #     [[tag], [mean], ["all"]],
-                #     names=["tag", "mean", "bootstrap_id"]
-                # )
-                # all_rates.append(new_rows)
-                #
-
-                
+            with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
+                    
+                ##### ALL ANALYSES ######################################
+                rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=pre_mean, post_mean=post_mean)
+                run_ids = get_run_ids(rows, params, tag=None)
                 t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
                 
                 
                 new_rows = pd.DataFrame({
-                    # entropy_tag: entropies_pre,
                     delay_tag: delay_estimates,
                 })
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [mean], range(len(delay_estimates))],
+                    [[tag], [pre_mean], range(len(delay_estimates))],
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 all_metrics.append(new_rows)
@@ -169,16 +156,14 @@ def main():
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [mean], range(population_FR.shape[0])],
+                    [[tag], [pre_mean], range(population_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 all_rates.append(new_rows)
     
     
-        df_rates = pd.concat(all_rates)
-        df_metrics = pd.concat(all_metrics)
-        # df_all_runs_delays = pd.concat(all_runs_delays)
-        # plt.xlim(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125)
+    df_rates = pd.concat(all_rates)
+    df_metrics = pd.concat(all_metrics)
     
     
     
@@ -186,121 +171,58 @@ def main():
     # PLOT - FIRING RATE AND INDIVIDUAL DELAY ESTIMATES
     #=============================================================================== 
     if plot_rate_and_delays:
-        t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-        for m, mean in enumerate(means):
-            figname = f"Firing rates (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
+        for exp in exps:
+            pre_mean = exp[mean_tag][0] # Could be any tag
+            t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
+            figname = f"Firing rates (mean: {pre_mean}; pre_FR: {pre_FR}; post_FR: {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
             fig, ax1 = plt.subplots(num=figname)
             ax1.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
                     xlim=(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125))
     
             plot_axvline_at_change(params, control, ax1)              
-    
+        
             ax2 = ax1.twinx()   
             ax2.set(ylabel="Density of delays", yticks=np.linspace(0, 0.5, 3), ylim=(0, 0.5))
     
             bin_center = (t_bins[:-1] + t_bins[1:]) / 2
-            # bin_center = bin_center[:-1]
-    
-    
-            df = df_rates.xs(mean, level=("mean"))
-            for tag, g in df.groupby(level="tag"):
-                gb = g[g.index.get_level_values("bootstrap_id") != "all"]
+        
+            df = df_rates.xs(pre_mean, level=("mean"))
+            for tag, gb in df.groupby(level="tag"):
                 label = Label[tag]
                 color = Color[tag]
-    
-                # Delay Estimation across all runs
-                # d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
-                # ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
+                
     
                 # g: rows = sims, cols = points
                 mu = gb.mean(axis=0)
                 std = gb.std(axis=0)
+        
     
-    
-                ax1.plot(bin_center, gb.T, color=color)
-                ax1.plot(bin_center, mu, label=label, color="k")
-                ax1.fill_between(bin_center, mu+std, mu-std, color="k", alpha=0.25, zorder=5)
+                ax1.plot(bin_center, mu, label=label, color=color)
+                ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=5)
                 # break
                 halved = mu.size // 2
-                ax1.axhline(mu[halved:].mean(), color=color)
-    
-                # ax1.plot(bin_center, g.xs("all", level="bootstrap_id").squeeze(), ls="dotted", color=color)
-    
+                ax1.axhline(mu[halved:].mean())
+        
                 # Hist delays
-                delays = df_metrics.xs((tag, mean), level=("tag", "mean"))["delay"]
-                ax2.hist(delays + t_start, bins=t_bins, color=color, density=True, zorder=-4, rwidth=0.9, alpha=0.5)
-    
-    
-    
-                # rgb = np.asarray([0, 0, 0], dtype=float)
-                # threshold = 8
-                #
-                # import itertools
-                # consecutive_True = lambda condition: [ sum( 1 for _ in group ) for key, group in itertools.groupby( condition ) if key ]
-                #
-                # std_latter = std[-std.size:].mean()
-                # mu_latter = mu[-mu.size:].mean()
-                # for (_, fr), delay in zip(gb.iterrows(), delays):
-                #     index = (t_bins >= t_start + delay).argmax() # Gets first value that is larger than duration_pre
-                #
-                #     osc_over    = fr[:index] > (1.5*std_latter + mu_latter)
-                #     osc_first_over = osc_over.argmax() # Gets the first True value
-                #     osc_under   = fr[osc_first_over:index] < (1.5*std_latter + mu_latter)
-                #     osc = True if np.count_nonzero(osc_first_over) > threshold and np.count_nonzero(osc_under) > threshold else False
-                #
-                #     above = fr[:index] > (3*std_latter + mu_latter)
-                #     overshoot = True if np.any(above) and np.max(consecutive_True(above)) > threshold else False
-                #
-                #     undershoot = False if osc or overshoot else True
-                #
-                #     rgb += [overshoot, osc, undershoot]
-                #
-                # rgb /= len(gb)
-                # # print(rgb)
-                # ax1.scatter(t_start + delays.mean(), 10, color=rgb.reshape([1, 3]), marker="o", zorder=20)
-                # ax1.text(t_start + delays.mean(), 10, Label[tag], va="bottom", ha="center")
-                #
-    
-    
-    
+                delays = df_metrics.xs((tag, pre_mean), level=("tag", "mean"))["delay"]
+                ax2.hist(delays + t_start, bins=t_bins, density=True, zorder=-4, rwidth=0.9, alpha=0.5, color=color)
+        
+        
+        
             ax1.set_ylim(bottom=0) 
             ax1.legend()
     
-            save_figure(figname, fig)
-    
-    
-    #===============================================================================
-    # PLOT - ENTROPY OVER DELAY
-    #=============================================================================== 
-    if plot_entropy_over_delay:
-        figname_preentropy = f"preentropy (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
-        fig, ax_entropy = plt.subplots(num=figname_preentropy)
-        ax_entropy.set(xlabel="Entropy [nats]", ylabel="Delay [ms]", ylim=ylim_delay)
-        handles = []
-        for tag in (mean_tag, std_tag, mean_std_tag):
-    
-            label = Label[tag]
-            color = Color[tag]
-            handles.append((mpatches.Patch(facecolor=color, label=label)))
-            kwargs = {
-                "levels": 4, 
-                "fill": False, 
-                "color": color,
-            }
-    
-            for m, mean in enumerate(means):
-                metrics_tmp = df_metrics.xs((tag, mean), level=("tag", "mean"))
-                sns.kdeplot(x=metrics_tmp[entropy_tag], y=metrics_tmp[delay_tag], **kwargs, ax=ax_entropy)
-        ax_entropy.legend(handles=handles)
-    
+        # save_figure(figname, fig)
+
     
     #===============================================================================
     # PLOT - TRANSIENT ESTIMATES
     #=============================================================================== 
     if plot_transient_estimates:
-        figname_transient = f"Delay estimates (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
+        figname_transient = f"Network Control Delay estimates (FR: {pre_FR} to {post_FR})"
         fig, ax_transient = plt.subplots(num=figname_transient)
         ax_transient.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Delay [ms]", ylim=ylim_delay,)
+
         sns.violinplot(df_metrics, x="mean", y="delay", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
                        hue_order=hue_order, ax=ax_transient, native_scale=True,)
@@ -308,7 +230,7 @@ def main():
         for tag in hue_order:
             handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
         plt.legend(handles=handles)
-        save_figure(figname_transient, fig)
+        # save_figure(figname_transient, fig)
     
     
     

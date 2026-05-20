@@ -18,9 +18,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from constants import Label, Color
 
-
+from constants import Label, Color, KTH_grey
+    
 #===============================================================================
 # METHODS
 #===============================================================================
@@ -54,7 +54,7 @@ def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, ad
         ax.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
         
         halved = mu.size // 2
-        ax.axhline(mu[halved:].mean(), color=color, **plot_kwargs)
+        # ax.axhline(mu[halved:].mean(), color=color, **plot_kwargs)
         
     
 def hist_delays(mean:float, df_delays:pd.DataFrame, t_bins:np.ndarray, ax:object, t_start:float=0.):
@@ -89,23 +89,48 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
     :param ax: The axis which to plot it on.
     :type ax: Axis-object of matplotlib.
     """
-    plot_kwargs["color"] = plot_kwargs.get("color", "red")
+    plot_kwargs["color"] = plot_kwargs.get("color", KTH_grey)
     plot_kwargs["ls"] = plot_kwargs.get("ls", "--")
     plot_kwargs["zorder"] = plot_kwargs.get("zorder", 10)
+    plot_kwargs["ymax"] = plot_kwargs.get("ymax", 0.89)
     
     t_onset = params.warmup + params.duration_pre
     
-    ax.axvline(t_onset, **plot_kwargs)
+    label_start = r"$t_\Delta$"
+    label_end   = r"$t_\Delta'$"
+    
     if control.brief_stimulus:
         for i in range(params.stim_reps):
             d = params.stim_duration + params.break_duration
-            ax.axvline(t_onset + d*i + params.stim_duration, **plot_kwargs)
-            ax.axvline(t_onset + d*i, **plot_kwargs)
-
-    if control.brief_stimulus:
-        ax.set_xticks(list(ax.get_xticks()) + [t_onset, t_onset+params.stim_duration], 
-                      list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+            
+            xstart  = t_onset + d*i
+            ax.axvline(xstart, **plot_kwargs)
+            
+            xend    = t_onset + d*i + params.stim_duration
+            plot_kwargs_tmp = dict(plot_kwargs)
+            plot_kwargs_tmp["color"] = "salmon"
+            ax.axvline(xend, **plot_kwargs_tmp)
+            if i == 0:
+                add_toplabel(ax, xstart, label_start)
+                add_toplabel(ax, xend, label_end)
     else:
-        ax.set_xticks(list(ax.get_xticks()) + [t_onset, ], 
-                      list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", ]) 
+        ax.axvline(t_onset, **plot_kwargs)
+        add_toplabel(ax, t_onset, label_start)
 
+
+    # if control.brief_stimulus:
+    #     ax.set_xticks(list(ax.get_xticks()) + [t_onset, t_onset+params.stim_duration], 
+    #                   list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", r"$t_\Delta'$"])  
+    # else:
+    #     ax.set_xticks(list(ax.get_xticks()) + [t_onset, ], 
+    #                   list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", ]) 
+        
+def add_toplabel(ax:object, x:float, label:str):
+    ax.text(
+        x,
+        0.90,                     # slightly above axes
+        label,
+        transform=ax.get_xaxis_transform(),
+        ha="center",
+        va="baseline"
+    )
