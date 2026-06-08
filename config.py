@@ -51,9 +51,8 @@ class Params:
     warmup: float         = 100.
     duration_pre: float   = 400.
     duration_post: float  = 1000.
-    stim_duration: float  = nif.tau * 2
+    stim_duration: float  = nif.tau * 1.5
     # stim_duration: float  = nif.tau / 2
-    # break_duration: float = nif.tau * 0.5
     break_duration: float = 5.
     stim_reps: int        = 5
     

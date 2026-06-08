@@ -38,7 +38,7 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 figsize = (17.6*cm, 15*cm)
 fname = "figure4_network"
 
-ylabel_recovery = "Recovery Time [ms]"
+ylabel_recovery = "Recovery [ms]"
 ylabel_fr = "FR [Hz]"
 xlabel_time = r"Time [ms]"
 xlabel_mean = r"Mean drive $\mu_{pre}$"
@@ -232,7 +232,7 @@ def main(params:object, control:object):
     plot_kwargs = {"markersize": 2}
     
     ax = fig.add_subplot(gs[0, 2])
-    title = f"Activity over Time"
+    title = f"Activity over Time" + "\n"
     ax.set(title=title, **ax_kwargs)
     plot_axvline_at_change(params, control, ax)
     ax.set(xlim=xlim_time)
@@ -242,10 +242,10 @@ def main(params:object, control:object):
     
     handles, labels = ax.get_legend_handles_labels()
     labels_updated = []
-    for neural_type in ("E", "I"):
-        for label in labels:
-            labels_updated.append(rf"{label} ({neural_type})")
-    ax.legend(handles, labels, ncols=2)
+    for l, label in enumerate(labels):
+        neural_type = "E" if l < 3 else "I"
+        labels_updated.append(rf"{label} ({neural_type})")
+    ax.legend(handles, labels_updated, ncols=2, handlelength=3)
     
     _, ax_tmp = plt.subplots(num="Network response")
     ax_tmp.set(title=title, **ax_kwargs)
@@ -296,7 +296,7 @@ def main(params:object, control:object):
 
     #===============================================================================
     ## DELAY OVER MEAN -- MEAN AND MEDIAN
-    title = f"Mean Recovery Time"
+    title = f"Mean Recovery Time" + "\n"
     ax_mean_delay = fig.add_subplot(gs[1, 1])
     ax_mean_delay.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_mean_delay.set_xticks(means)
@@ -353,7 +353,7 @@ def main(params:object, control:object):
     Erates_CV = Erates_std / Erates_mean
     Erates_CV = Erates_CV.reset_index(name="CV")
     
-    title = "Coefficient of Variation"
+    title = "Coefficient of Variation" + "\n"
     ax_CV = fig.add_subplot(gs[1, 2])
     ax_CV.set(ylabel=ylabel_recovery, xlabel="CV", title=title)
     ax_CV.set_yticks(means)
@@ -374,7 +374,7 @@ def main(params:object, control:object):
     handles = []
     for tag in hue_order:
         handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
-    plt.legend(handles=handles)
+    ax_CV.legend(handles=handles)
     
 
     #===============================================================================
@@ -452,7 +452,7 @@ def main(params:object, control:object):
         
     
     ax_control = fig.add_subplot(gs[2, 1])
-    title = "Feedforward Control"
+    title = "Feedforward Control" + "\n"
     ax_control.set(title=title, **ax_kwargs)
     plot_axvline_at_change(params, control, ax_control)
     ax_control.set(xlim=xlim_time)
@@ -476,9 +476,9 @@ def main(params:object, control:object):
 
     ax_control_recovery = fig.add_subplot(gs[2, 2])
 
-    title = f"Recovery Time (Control)"
+    title = f"Recovery Time (Control)" + "\n"
     xticks = [exp[mean_tag][0] for exp in exps]
-    ax_control_recovery.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay,)
+    ax_control_recovery.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay, title=title)
 
     sns.violinplot(
         df_metrics, x="mean", y="delay", 

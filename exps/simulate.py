@@ -59,8 +59,8 @@ post_FR = 5.
 pre_FR = 5.
 post_FR = 10.
 #
-# pre_FR = 10.
-# post_FR = 5.
+pre_FR = 10.
+post_FR = 5.
 # # #
 # pre_FR = 4.
 # post_FR = 6.

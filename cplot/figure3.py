@@ -41,7 +41,7 @@ figsize = (17.6*cm, 15*cm)
 fname = "figure3_stimulus"
 
 force = False
-force = True
+# force = True
 
 control, params = load_config(no_stim=True)
 xlim_time = (params.warmup + params.duration_pre - 25, params.warmup + params.duration_pre + 65)
@@ -69,9 +69,10 @@ post_FR_up = 10
 pre_FR_down = 10
 post_FR_down = 5
 
-stim_reps = np.asarray([1, 2, 5])
+stim_reps = np.asarray([2, 5])
 
 stim_durations = np.round(np.asarray([nif.tau / 3, nif.tau / 2, nif.tau, nif.tau * 2]))
+stim_durations = np.round(np.asarray([nif.tau / 2, nif.tau, nif.tau * 1.5, nif.tau * 2]))
 # stim_durations = np.round(np.asarray([nif.tau]))
 
 bootstraps = 100
@@ -79,10 +80,12 @@ samples_per_strap = 50
     
 
 means = np.asarray([220., 260., 300.])
-means = np.arange(220, 320+1, 20.)
+means = np.arange(220, 320+1, 40.)
+# means = np.arange(220, 320+1, 20.)
 
 
-plot_mean = 240.
+plot_mean = 260.
+# plot_mean = 240.
 xticks_mean = means[::2]
 
 fn_id    = f"_{pre_FR_up}"
@@ -524,7 +527,7 @@ def main():
         hspace=.3,
     )
     df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
-    df_delays_tmp = df_delays_tmp[df_delays_tmp.index.isin(means[::2], level="mean")]
+    df_delays_tmp = df_delays_tmp[df_delays_tmp.index.isin(means[::1], level="mean")]
     
     
     for i, ((tag, mean), gb) in enumerate(df_delays_tmp.groupby(level=("tag", "mean"))):

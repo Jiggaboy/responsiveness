@@ -23,7 +23,7 @@ import datetime
 import tables as tb
 import numpy as np
 
-from lib.util import yes_no, prepend_dir
+from lib.util import yes_no, prepend_dir, mkdir
 
 from constants import mean_tag, std_tag, mean_std_tag
 
@@ -68,6 +68,7 @@ class ResponseHdf5(tb.File):
             file = args.pop(0)
         logger.info(f"Update filename with dir: {file}")
         path = prepend_dir(file, DATA_DIR)
+        mkdir(path)
         super().__init__(path, *args, **kwargs)
         
         if not metadata_tag in self.root:

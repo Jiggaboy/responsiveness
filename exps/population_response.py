@@ -91,7 +91,7 @@ post_FR = 10.
 # pre_FR = 10.
 # post_FR = 5.
 
-means = np.arange(220, 320+1, 40.)
+means = np.arange(320, 320+1, 40.)
 # means = np.arange(220, 320+1, 10.)
 
 # Equivalent for network with J=0.075

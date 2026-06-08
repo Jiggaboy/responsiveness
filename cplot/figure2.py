@@ -40,6 +40,9 @@ figsize = (17.6*cm, 15*cm)
 fname = "figure2_recovery"
 
 
+xlabel = r"Mean drive $\mu_{pre}$"
+ylabel = "Recovery [ms]"
+    
 ylim_delay = (0, 80)
 FR_lim = (0, 12)
 
@@ -228,8 +231,6 @@ def main():
     post_FR = FRs_to_plot[0]
     title = f"Recover Time\n(FR: {pre_FR} to {post_FR})"
     
-    xlabel = r"Mean drive $\mu_{pre}$"
-    ylabel = "Recovery Time [ms]"
 
     ax_transient.set(ylabel=ylabel, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)

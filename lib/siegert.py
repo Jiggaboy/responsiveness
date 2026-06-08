@@ -59,7 +59,7 @@ def FR_from_siegert(mean:float, std:float, dt:float)->float:
         Predicted FR.
 
     """
-    mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt, membrane_capacitance=nif.capacitance)
+    mean_tmp, var_tmp = potential_from_moments(mean, std**2, tau_ms=nif.tau, dt=dt, membrane_capacitance=nif.C_m)
     return siegert(mean_tmp, np.sqrt(var_tmp), tau_ref=nif.t_ref*1e-3, tau_m=nif.tau*1e-3, threshold=nif.V_th*1e-3)
 
 #===============================================================================

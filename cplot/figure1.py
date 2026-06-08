@@ -193,7 +193,7 @@ def main():
     df_rates = pd.concat(all_rates)
     
     ax = fig.add_subplot(gs[2, 0])
-    ax.set(title="Ind. Traces", **ax_kwargs)
+    ax.set(title="Ind. Traces\n", **ax_kwargs)
     plot_FRs(mean, df_rates, t_bins, ax, add_traces=True)
     
     # bin_center = (t_bins[:-1] + t_bins[1:]) / 2
@@ -266,14 +266,17 @@ def main():
     ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", title=f"Time to First Spike\nDistribution")
     ax.set_ylim(-5, 150)
 
-    df_tmp = df[df.index.isin([240, 280, 320], level="mean")] - (params.warmup + params.duration_pre)
+    plot_means = [240, 280, 320]
+    df_tmp = df[df.index.isin(plot_means, level="mean")] - (params.warmup + params.duration_pre)
     sns.violinplot(df_tmp, x="mean", y="firstspike", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
                        inner=None,
                        hue_order=hue_order, ax=ax,
+                       native_scale=True,
             palette=Color,
             legend=False,
             )
+    
     
     # handles = []
     # for tag in hue_order:
@@ -282,7 +285,7 @@ def main():
         
     
     ax = fig.add_subplot(gs[2, 2])
-    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", ylim=(25, 87), xticks=(means[::4]), title="Time to First Spike")
+    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", ylim=(25, 87), xticks=(means[::4]), title="Time to First Spike\n")
         
     sns.lineplot(
         data=df - (params.warmup + params.duration_pre),

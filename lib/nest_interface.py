@@ -4,7 +4,8 @@
 Summary:
     Used in the scripts population response and synaptic_correlation.
 
-Description:
+History:
+    - v0.1b: Refactor create_LIF.
 
 
 """
@@ -13,7 +14,7 @@ Description:
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1a'
+__version__ = '0.1b'
 
 #===============================================================================
 # IMPORT STATEMENTS
@@ -30,12 +31,20 @@ import nest
 # NEURON PARAMETER
 #===============================================================================
 neuron_model = "iaf_psc_delta_ps"
-tau = 15.           # ms
-t_ref = .1          # ms
+tau =  6.           # ms
+t_ref = 2.          # ms
 E_L = 0.            # mV
 V_reset = 0.        # mV
 V_th = 20.          # mV
-capacitance = 250.  # pF
+C_m = 250.   *tau/15       # pF
+##### DEFAULT VALUES
+# neuron_model = "iaf_psc_delta_ps"
+# tau = 15.           # ms
+# t_ref = .1          # ms
+# E_L = 0.            # mV
+# V_reset = 0.        # mV
+# V_th = 20.          # mV
+# C_m = 250.          # pF
 
 #===============================================================================
 # RECORDER PARAMETER
@@ -60,17 +69,25 @@ class Generator:
 # METHODS
 #===============================================================================
 
-def create_LIF(N):
+def create_LIF(N, **kwargs):
+    """
+    History:
+        - v0.1b: Allow for kwargs. C_m added as parameter. 
+    """
     logger.info(f"Neuron model: {neuron_model}")
     logger.info(f"Membrane time constant (tau): {tau}")
-    neuron_params = {
-          "tau_m": float(tau),
-          "E_L": float(E_L),
-          "V_reset": float(V_reset),
-          "V_th": float(V_th),
-          "t_ref": float(t_ref),
-          "V_m": np.random.normal(loc=(V_th-V_reset) / 2, scale=(V_th-V_reset) / 4, size=N)
-      }
+    neuron_params = {}
+    neuron_params["tau_m"]  = kwargs.get("tau_m", tau)
+    neuron_params["C_m"]  = kwargs.get("C_m", C_m)
+    neuron_params["E_L"]    = kwargs.get("E_L", E_L)
+    neuron_params["V_reset"]= kwargs.get("V_reset", V_reset)
+    neuron_params["V_th"]   = kwargs.get("V_th", V_th)
+    neuron_params["t_ref"]  = kwargs.get("t_ref", t_ref)
+    neuron_params["V_m"]    = np.random.normal(
+        loc =   (neuron_params["V_th"] - neuron_params["V_reset"]) / 2, 
+        scale = (neuron_params["V_th"] - neuron_params["V_reset"]) / 4, 
+        size =  N
+    )
     return nest.Create(neuron_model, N, params=neuron_params)
 
 
