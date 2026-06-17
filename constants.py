@@ -14,9 +14,9 @@ __version__ = '0.1a'
 # rcParams
 #===============================================================================
 from matplotlib.pyplot import rcParams
-
-rcParams["legend.fontsize"] = "small"
-rcParams["legend.handlelength"] = 4
+#
+# rcParams["legend.fontsize"] = "small"
+# rcParams["legend.handlelength"] = 4
 
 #===============================================================================
 # KTH COLORS
@@ -43,7 +43,7 @@ mean_std_tag = "both"
 delay_tag = "delay"
 entropy_tag = "entropy"
 
-hue_order = [mean_tag, std_tag, mean_std_tag]
+hue_order = [std_tag, mean_tag, mean_std_tag]
 
 Color = {mean_tag: "tab:blue", std_tag: "tab:orange", mean_std_tag: "tab:green"}
 Color = {mean_tag: KTH_turquoise, std_tag: KTH_brick, mean_std_tag: KTH_yellow}

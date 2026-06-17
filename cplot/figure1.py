@@ -34,12 +34,16 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 
 
-plt.rcParams["lines.linewidth"] = 1
+# plt.rcParams["lines.linewidth"] = 1
 #===============================================================================
 # CONSTANTS
 #===============================================================================
 figsize = (17.6*cm, 15*cm)
 fname = "figure1_response_kernels"
+
+ylim_timetospike = (-2, 125)
+ylim_fr = (0, 21)
+
     
 pre_FR = 5
 post_FR = 10
@@ -64,13 +68,13 @@ def main():
         right=0.96,
         bottom=0.06,
         top=0.94,
-        wspace=0.25,
-        hspace=0.6
+        wspace=0.3,
+        hspace=0.65
     )
     
     ### Schematic
     ax = fig.add_subplot(gs[0, 2])
-    ax.set(xlabel="Time [ms]", ylabel="FR [Hz]", ylim=(0.4, 3), xlim=(0, 65), title="Response Kernels")
+    ax.set(xlabel=xlabel_time, ylabel=ylabel_fr, ylim=(0.4, 3), xlim=(0, 65), title="Response Kernels")
     ax.set_yticks([1, 2], [r"$FR_{pre}$", r"$FR_{post}$"])
     xticks = np.arange(0, 60+1, 20)
     xlabels = list(xticks)
@@ -115,8 +119,8 @@ def main():
     df_delays = pd.concat(all_metrics)
         
     ax_kwargs = {
-        "xlabel": "Time [ms]", "ylabel": "FR [Hz]", "ylim": (0, 21),
-        "xlim": (params.warmup + params.duration_pre - 20, params.warmup + params.duration_pre + 100),
+        "xlabel": xlabel_time, "ylabel": ylabel_fr, "ylim": ylim_fr,
+        "xlim": (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 85),
     }    
     axt_kwargs = {
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
@@ -141,7 +145,7 @@ def main():
         # axt.set(**axt_kwargs)
         # hist_delays(mean, df_delays, t_bins, axt, t_start=params.warmup+params.duration_pre)
         if m == 1:
-            ax.legend()
+            ax.legend(reverse=True)
     #
     # ax = fig.add_subplot(gs[0, 2])
     # ax.set(**ax_kwargs)
@@ -263,15 +267,17 @@ def main():
     # PLOT -  TIME TO FIRST SPIKE
     #===============================================================================
     ax = fig.add_subplot(gs[2, 1])
-    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", title=f"Time to First Spike\nDistribution")
-    ax.set_ylim(-5, 150)
+    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", 
+           title=f"Time to First Spike\nDistribution",
+           ylim=ylim_timetospike)
 
     plot_means = [240, 280, 320]
     df_tmp = df[df.index.isin(plot_means, level="mean")] - (params.warmup + params.duration_pre)
     sns.violinplot(df_tmp, x="mean", y="firstspike", hue="tag", 
                        cut=0, density_norm="width", common_norm=True, 
                        inner=None,
-                       hue_order=hue_order, ax=ax,
+                       hue_order=hue_order, 
+                       ax=ax,
                        native_scale=True,
             palette=Color,
             legend=False,
@@ -319,7 +325,7 @@ def main():
             labels.append(rf"{stat.capitalize()}")
             # labels.append(rf"{stat.capitalize()} ({Label[tag]})")
     handles, _ = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, ncols=2, handlelength=3)
+    ax.legend(handles, labels, ncols=2)
 
 
     save_figure(fname, fig, is_latex=True)
@@ -350,9 +356,9 @@ def panel_schematic(ax:object):
     damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * 2 * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay, 2)
     # damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay)
     
-    ax.plot(t, undershoot + offset, color=KTH_sky, label="undershoot", zorder=10) 
-    ax.plot(t, overshoot + offset, color=KTH_blue, label="overshoot", zorder=20, alpha=0.75) 
-    ax.plot(t, damped_osc + offset, color=KTH_navy, label="damped osc.", zorder=15)
+    ax.plot(t, undershoot + offset, color=KTH_sky, label="Undershoot", zorder=10) 
+    ax.plot(t, overshoot + offset, color=KTH_blue, label="Overshoot", zorder=20, alpha=0.7) 
+    ax.plot(t, damped_osc + offset, color=KTH_navy, label="Damped osc.", zorder=15)
     ax.axvline(t_split, c=KTH_grey, ls="--")
     
 def exp_decay(t:np.ndarray, tau:float=1):

@@ -38,16 +38,11 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 figsize = (17.6*cm, 15*cm)
 fname = "figure4_network"
 
-ylabel_recovery = "Recovery [ms]"
-ylabel_fr = "FR [Hz]"
-xlabel_time = r"Time [ms]"
-xlabel_mean = r"Mean drive $\mu_{pre}$"
-
 control, params = load_config(is_network=True, no_stim=True)
 
-ylim_delay = (0, 80)
-ylim_FR = (0, 14)
-xlim_time = (params.warmup + params.duration_pre - 25, params.warmup + params.duration_pre + 65)
+ylim_delay = (0, 85)
+ylim_FR = (0, 15)
+xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 65)
     
 force = False
 # force = True
@@ -214,7 +209,7 @@ def main(params:object, control:object):
         bottom=0.06,
         top=0.93,
         wspace=0.3,
-        hspace=0.6
+        hspace=1,
     )      
     
     
@@ -237,15 +232,15 @@ def main(params:object, control:object):
     plot_axvline_at_change(params, control, ax)
     ax.set(xlim=xlim_time)
     
-    plot_FRs(plot_mean, df_Erates, t_bins, ax, **plot_kwargs)
-    plot_FRs(plot_mean, df_Irates, t_bins, ax, ls="--", **plot_kwargs)
+    plot_FRs(plot_mean, df_Erates, t_bins, ax, hue_order=hue_order, **plot_kwargs)
+    plot_FRs(plot_mean, df_Irates, t_bins, ax, ls="--", hue_order=hue_order, **plot_kwargs)
     
     handles, labels = ax.get_legend_handles_labels()
     labels_updated = []
     for l, label in enumerate(labels):
         neural_type = "E" if l < 3 else "I"
         labels_updated.append(rf"{label} ({neural_type})")
-    ax.legend(handles, labels_updated, ncols=2, handlelength=3)
+    ax.legend(handles, labels_updated, ncols=2)
     
     _, ax_tmp = plt.subplots(num="Network response")
     ax_tmp.set(title=title, **ax_kwargs)
@@ -273,7 +268,7 @@ def main(params:object, control:object):
     ax_transient = fig.add_subplot(gs[1, 0])
     title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})"
 
-    ax_transient.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
+    ax_transient.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(means)
     sns.violinplot(
         df_delays, x="mean", y="delay", 
@@ -298,7 +293,7 @@ def main(params:object, control:object):
     ## DELAY OVER MEAN -- MEAN AND MEDIAN
     title = f"Mean Recovery Time" + "\n"
     ax_mean_delay = fig.add_subplot(gs[1, 1])
-    ax_mean_delay.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
+    ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_mean_delay.set_xticks(means)
 
     sns.lineplot(
@@ -331,7 +326,8 @@ def main(params:object, control:object):
     # for stat in ("mean", "median"):
     for stat in ("mean", ):
         for tag in hue_order:
-            labels.append(rf"{stat.capitalize()} ({Label[tag]})")
+            labels.append(rf"{stat.capitalize()}")
+            # labels.append(rf"{stat.capitalize()} ({Label[tag]})")
     handles, _ = ax_mean_delay.get_legend_handles_labels()
     ax_mean_delay.legend(handles, labels)
     
@@ -355,7 +351,7 @@ def main(params:object, control:object):
     
     title = "Coefficient of Variation" + "\n"
     ax_CV = fig.add_subplot(gs[1, 2])
-    ax_CV.set(ylabel=ylabel_recovery, xlabel="CV", title=title)
+    ax_CV.set(ylabel=xlabel_drive, xlabel="CV", title=title)
     ax_CV.set_yticks(means)
     sns.violinplot(
         Erates_CV, x="CV", y="mean", 
@@ -386,7 +382,7 @@ def main(params:object, control:object):
     ax_raster.set(xlabel = xlabel_time, 
                   ylabel = "Neuron ID", 
                   xlim = (1000, 1050),
-                  title = f"Raster Plot\n({Label[tmp_tag]}; {plot_mean}pA)"
+                  title = f"Raster Plot\n(" + r"$\mu_{pre}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
                   )
     ax_raster.ticklabel_format(axis="y", style="scientific", scilimits=(0, 2), useMathText=True)
     
@@ -478,7 +474,7 @@ def main(params:object, control:object):
 
     title = f"Recovery Time (Control)" + "\n"
     xticks = [exp[mean_tag][0] for exp in exps]
-    ax_control_recovery.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay, title=title)
+    ax_control_recovery.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay, title=title)
 
     sns.violinplot(
         df_metrics, x="mean", y="delay", 

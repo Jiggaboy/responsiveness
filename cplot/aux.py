@@ -26,12 +26,18 @@ from constants import Label, Color, KTH_grey
 #===============================================================================
 
 
-def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, add_traces:bool=False, **plot_kwargs):
+def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, add_traces:bool=False, hue_order:tuple=None, **plot_kwargs):
     bin_center = (t_bins[:-1] + t_bins[1:]) / 2
     
     
     df = df_rates.xs(mean, level=("mean"))
-    for tag, g in df.groupby(level="tag"):
+    
+    if hue_order is not None:
+        groups = ((tag, df.xs(tag, level="tag")) for tag in hue_order)
+    else:
+        groups = df.groupby(level="tag")
+
+    for tag, g in groups:
         # Set Colors & Labels
         label = Label[tag]
         color = Color[tag]
@@ -128,7 +134,7 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
 def add_toplabel(ax:object, x:float, label:str):
     ax.text(
         x,
-        0.90,                     # slightly above axes
+        0.92,                     # slightly above axes
         label,
         transform=ax.get_xaxis_transform(),
         ha="center",

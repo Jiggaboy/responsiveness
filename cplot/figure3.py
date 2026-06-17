@@ -44,16 +44,15 @@ force = False
 # force = True
 
 control, params = load_config(no_stim=True)
-xlim_time = (params.warmup + params.duration_pre - 25, params.warmup + params.duration_pre + 65)
-xlim_extendedtime = (params.warmup + params.duration_pre - 25, params.warmup + params.duration_pre + 125)
+xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 65)
+xlim_extendedtime = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 125)
 ylim_recovery = (0, 90)
 # ylim_recovery = (15, 40)
 yticks_recovery = np.arange(0, 100, 25)
 ylim_FR = (0, 15)
 ylabel_recovery = "Recovery Time [ms]"
 ylabel_fr = "FR [Hz]"
-xlabel_time = r"Time [ms]"
-xlabel_mean = r"Mean drive $\mu_{pre}$"
+xlabel_drive = r"Mean drive $\mu_{pre}$"
 
 marker_up = "^"
 marker_down = "v"
@@ -69,10 +68,10 @@ post_FR_up = 10
 pre_FR_down = 10
 post_FR_down = 5
 
-stim_reps = np.asarray([2, 5])
+stim_reps = np.asarray([1, 2, 5])
 
 stim_durations = np.round(np.asarray([nif.tau / 3, nif.tau / 2, nif.tau, nif.tau * 2]))
-stim_durations = np.round(np.asarray([nif.tau / 2, nif.tau, nif.tau * 1.5, nif.tau * 2]))
+# stim_durations = np.round(np.asarray([nif.tau / 2, nif.tau, nif.tau * 1.5, nif.tau * 2]))
 # stim_durations = np.round(np.asarray([nif.tau]))
 
 bootstraps = 100
@@ -80,7 +79,7 @@ samples_per_strap = 50
     
 
 means = np.asarray([220., 260., 300.])
-means = np.arange(220, 320+1, 40.)
+means = np.arange(220, 320+1, 20.)
 # means = np.arange(220, 320+1, 20.)
 
 
@@ -292,9 +291,9 @@ def main():
         left=0.06,
         right=0.98,
         bottom=0.08,
-        top=0.93,
+        top=0.94,
         wspace=0.25,
-        hspace=1,
+        hspace=1.2,
     )
     
     ax_kwargs = {
@@ -330,11 +329,12 @@ def main():
         # hist_delays(plot_mean, df_delays_tmp, t_bins, axt, t_start=params.warmup+params.duration_pre)
         
         ax.set_xlim(ax_kwargs["xlim"])
-        ax.legend()
+        if idx == 0:
+            ax.legend(reverse=True, loc='lower right')
    
 
     ax = fig.add_subplot(gs[:1, 2])
-    ax.set(xlabel=xlabel_mean, ylabel=ylabel_recovery, ylim=ylim_recovery, xticks=xticks_mean)
+    ax.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_recovery, xticks=xticks_mean)
     ax.set_title("Recovery Time\n")
     
     for idx, (pre_FR, post_FR, mark, ls) in enumerate(zip((pre_FR_up, pre_FR_down), (post_FR_up, post_FR_down), marker, lss)):
@@ -375,7 +375,7 @@ def main():
         for tag in hue_order:
             labels.append(rf"Mean ({stat})")
     handles, _ = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, ncols=2)
+    ax.legend(handles, labels, ncols=2, loc='upper left')
     
     #===============================================================================
     # PLOTS - TRANSIENTS
@@ -464,7 +464,7 @@ def main():
         # ax_kwargs = {"ylim": ylim_recovery, "ylabel": ylabel, 
         #              "yticks": np.arange(ylim_recovery[0], ylim_recovery[1]+15, 20), 
         #              "xticks": means[::2]}
-        title = f"Recovery Time ({stim_rep} stimulation" + "s" * (stim_rep.item() > 1) + ")" + "\n"
+        title = f"Recovery Time\n({stim_rep} stimulation" + "s" * (stim_rep.item() > 1) + ")" #+ 
         for tag, gb in df_delays_tmp.groupby(level="tag"):
             if tag == mean_tag:
                 ax = ax_response_mean
@@ -480,7 +480,7 @@ def main():
                 raise ValueError
             
             if s == 2:
-                ax.set(xlabel=xlabel_mean)
+                ax.set(xlabel=xlabel_drive)
             else:
                 ax.tick_params(labelbottom=False)
                 

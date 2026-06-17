@@ -30,6 +30,17 @@ BS_COLOR = "magenta"
 
 cm = 1 / 2.54
 
+############ LABELS #########################
+
+
+xlabel_time = "Time [ms]"
+ylabel_fr   = "FR [Hz]"
+
+xlabel_drive = r"Mean drive $\mu_{pre}$"
+ylabel_recovery = "Recovery Time [ms]"
+
+
+
 ############ LIMITS #########################
 max_delay = 75
 
@@ -40,10 +51,10 @@ rcParams["axes.labelpad"] = 2
 rcParams["errorbar.capsize"] = 2
 rcParams["font.size"] = 8
 rcParams["legend.fontsize"] = 7
-rcParams["legend.markerscale"] = 0.6
-rcParams["legend.handlelength"] = 1.25
+rcParams["legend.markerscale"] = 0.7
+rcParams["legend.handlelength"] = 1.5
 rcParams["legend.columnspacing"] = 1
-rcParams["legend.handletextpad"] = 1
+rcParams["legend.handletextpad"] = .6
 rcParams["legend.labelspacing"] = .1
 rcParams["legend.borderpad"] = .25
 rcParams["legend.handletextpad"] = .5

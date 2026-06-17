@@ -39,11 +39,8 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 figsize = (17.6*cm, 15*cm)
 fname = "figure2_recovery"
 
-
-xlabel = r"Mean drive $\mu_{pre}$"
-ylabel = "Recovery [ms]"
     
-ylim_delay = (0, 80)
+ylim_delay = (0, 85)
 FR_lim = (0, 12)
 
 force = False
@@ -78,7 +75,7 @@ fn_delay = "dfdelay" + fn_id
 #===============================================================================
 def main():
     control, params = load_config()
-    xlim_time = (params.warmup + params.duration_pre - 20, params.warmup + params.duration_pre + 100)
+    xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 85)
     
     metadata = {
         "post_FRs": post_FRs,
@@ -175,16 +172,16 @@ def main():
         bottom=0.08,
         top=0.93,
         wspace=0.25,
-        hspace=0.5
+        hspace=0.6
     )
     
     #===============================================================================
     # PLOTS - Row 1: Firing rates across means and post FRs
     #===============================================================================
     ax_kwargs = {
-        "xlabel": "Time [ms]", "ylabel": "FR [Hz]", "ylim": FR_lim,
+        "xlabel": xlabel_time, "ylabel": ylabel_fr, "ylim": FR_lim,
         "xlim": xlim_time,
-        "yticks": np.arange(*FR_lim, 2),
+        "yticks": np.arange(*FR_lim, 3),
     }    
     axt_kwargs = {
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
@@ -209,7 +206,7 @@ def main():
         ax.set_xlim(ax_kwargs["xlim"])
     
         if i == 1:
-            ax.legend()
+            ax.legend(reverse=True)
     
     # axt = ax.twinx()   
     # axt.set(**axt_kwargs)
@@ -224,15 +221,15 @@ def main():
     
     gs_delays = gs[1:, :2].subgridspec(nrows=2, ncols=1,
         wspace=0.3,
-        hspace=0.09,
+        hspace=0.4,
     )
     
     ax_transient = fig.add_subplot(gs_delays[0, 0])
     post_FR = FRs_to_plot[0]
-    title = f"Recover Time\n(FR: {pre_FR} to {post_FR})"
+    title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})"
     
 
-    ax_transient.set(ylabel=ylabel, ylim=ylim_delay, title=title)
+    ax_transient.set(ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
     df_tmp = df_delays.xs(post_FR, level="post_FR")
     sns.violinplot(df_tmp, x="mean", y="delay", hue="tag", 
@@ -251,7 +248,8 @@ def main():
 
     # ax_mean_delay = fig.add_subplot(gs[1, 0])
     ax_mean_delay = fig.add_subplot(gs_delays[1, 0])
-    ax_mean_delay.set(xlabel=xlabel, ylabel=ylabel, ylim=ylim_delay)
+    title = f"Mean Recovery Time\n(FR: {pre_FR} to {post_FR})"
+    ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
 
     sns.lineplot(
         data=df_tmp,
@@ -285,7 +283,7 @@ def main():
             # labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
             labels.append(rf"{stat.capitalize()}")
     handles, _ = ax_mean_delay.get_legend_handles_labels()
-    ax_mean_delay.legend(handles, labels, fontsize="small", ncols=2, handlelength=3)
+    ax_mean_delay.legend(handles, labels, ncols=2)
     
 
     #===============================================================================
@@ -330,15 +328,15 @@ def main():
     )
     
     # ax_response = fig.add_subplot(gs[1:, 2])
-    gs_kernel = gs[1:, 2].subgridspec(nrows=3, ncols=1, hspace=0.1)
+    gs_kernel = gs[1:, 2].subgridspec(nrows=3, ncols=1, hspace=0.2)
     ax_response_mean = fig.add_subplot(gs_kernel[0])
     ax_response_std  = fig.add_subplot(gs_kernel[1])
     ax_response_both = fig.add_subplot(gs_kernel[2])
         
-    ax_kwargs = {"ylim": ylim_delay, "ylabel": ylabel, 
+    ax_kwargs = {"ylim": ylim_delay, 
                  "yticks": np.arange(ylim_delay[0], ylim_delay[1]+15, 20), 
                  "xticks": means[::2]}
-    title = "Delay Estimates"
+    title = "Mean Recovery Time"
     for tag, gb in df_delays.groupby(level="tag"):
         if tag == mean_tag:
             ax = ax_response_mean
@@ -347,9 +345,10 @@ def main():
         elif tag == std_tag:
             ax = ax_response_std
             ax.tick_params(labelbottom=False)
+            ax.set_ylabel(ylabel_recovery)
         elif tag == mean_std_tag:
             ax = ax_response_both
-            ax.set_xlabel(xlabel)
+            ax.set_xlabel(xlabel_drive)
         else:
             raise ValueError
         ax.set(**ax_kwargs)
