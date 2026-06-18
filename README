@@ -1,3 +1,8 @@
+## Writing Convention
+- Modalities: which input parameter is changed, or both
+- Scenario: Single neuron or population, transient or persistent stimulation.
+- Stimulus: Extra input that is different from the baseline input.
+
 # Thoughs about the statistics of the population response
 The statistics differ depending on whether we average first and then calculate the delays, 
 or average the delays of individual runs.
