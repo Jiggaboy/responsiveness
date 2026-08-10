@@ -1,40 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Summary: 
+History: 
+    - v0.1b: Moving KTH colors to cplot/constants.
 """
 #===============================================================================
 # PROGRAM METADATA
 #===============================================================================
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
-__version__ = '0.1a'
+__version__ = '0.1b'
+
+from cplot.constants import KTH_brick, KTH_turquoise, KTH_yellow
 
 #===============================================================================
-# rcParams
-#===============================================================================
-from matplotlib.pyplot import rcParams
-#
-# rcParams["legend.fontsize"] = "small"
-# rcParams["legend.handlelength"] = 4
-
-#===============================================================================
-# KTH COLORS
-#===============================================================================
-KTH_green       = "#4DA060"
-KTH_turquoise   = "#339C9C"
-KTH_brick       = "#E86A58"
-KTH_yellow      = "#FFBE00"
-
-KTH_blue        = "#004791"
-KTH_navy        = "#000061"
-KTH_sky         = "#6298D2"
-
-KTH_grey        = "#A5A5A5"
-
-
-#===============================================================================
-# TAGS
+# TAGS - Indicates the value that is kept constant
 #===============================================================================
 mean_tag = "mean"
 std_tag = "std"
@@ -45,13 +25,20 @@ entropy_tag = "entropy"
 
 hue_order = [std_tag, mean_tag, mean_std_tag]
 
-Color = {mean_tag: "tab:blue", std_tag: "tab:orange", mean_std_tag: "tab:green"}
-Color = {mean_tag: KTH_turquoise, std_tag: KTH_brick, mean_std_tag: KTH_yellow}
-Label = {mean_tag: r"$\Delta \, \sigma$", std_tag: r"$\Delta \, \mu$", mean_std_tag: r"$\Delta \, \mu$&$\Delta \, \sigma$"}
+Color = {
+    mean_tag: KTH_turquoise, 
+    std_tag: KTH_brick, 
+    mean_std_tag: KTH_yellow
+}
+Label = {
+    mean_tag: r"$\Delta \, \sigma$", 
+    std_tag: r"$\Delta \, \mu$", 
+    mean_std_tag: r"$\Delta \, \mu$&$\Delta \, \sigma$"
+}
+
 #===============================================================================
 # DIRECTORIES
 #===============================================================================
-
 DATA_DIR        = "data"
 FIGURE_DIR      = "figures"
 LATEXFIGURE_DIR = "latex_figures"
@@ -59,7 +46,9 @@ LATEXFIGURE_DIR = "latex_figures"
 #===============================================================================
 # FIGURE SUFFICES
 #===============================================================================
-
-ANIMATION_SUFFIX = ".gif" # ".mp4"
+# https://matplotlib.org/stable/users/explain/animations/animations.html
+ANIMATION_SUFFIX = ".gif"
+# https://matplotlib.org/stable/users/explain/configuration.html#rcparam-savefig-format
+# {png, ps, pdf, svg}
 FIGURE_SUFFIX = ".svg"
 FIGURE_ALTERNATIVE_SUFFIX = ".png"

@@ -11,48 +11,61 @@ __version__ = '0.1'
 #===============================================================================
 # IMPORT STATEMENTS
 #===============================================================================
-import matplotlib.pyplot as plt
 from matplotlib import rcParams
-import numpy as np
-
-############ COLORS #########################
-
-## Updated on Jan 24. 2025
-KTH_GREEN = np.asarray((77, 160, 97)) / 255
-KTH_PINK = np.asarray((232, 106, 88)) / 255
-KTH_GREY = np.asarray((50, 50, 50)) / 255
-KTH_BLUE = np.asarray((0, 71, 145)) / 255
-KTH_LIGHT_BLUE = np.asarray((98, 152, 210)) / 255
-KTH_YELLOW = np.asarray((255, 190, 0)) / 255
-
-COLORS = (KTH_GREEN, KTH_PINK, KTH_GREY, KTH_BLUE, KTH_LIGHT_BLUE, KTH_YELLOW)
-BS_COLOR = "magenta"
 
 cm = 1 / 2.54
+#===============================================================================
+# KTH COLORS
+#===============================================================================
+## Updated on Aug 06. 2026
+KTH_green       = "#4DA060"
+KTH_turquoise   = "#339C9C"
+KTH_brick       = "#E86A58"
+KTH_yellow      = "#FFBE00"
+
+KTH_blue        = "#004791"
+KTH_navy        = "#000061"
+KTH_sky         = "#6298D2"
+
+KTH_grey        = "#A5A5A5"
+
+############ COLORS #########################
+EXC_NEURON = "#78001aff"
+INH_NEURON = "#004791ff"
+
+COVERSHOOT      = "mediumpurple"
+CUNDERSHOOT     = "yellowgreen"
+COSCILLATORY    = "cornflowerblue"
+
+
+
 
 ############ LABELS #########################
+label_drive_std    = r"Fluctuation level $\sigma$ [pA]"
+label_drive_mean   = r"Mean drive $\mu$ [pA]"
 
+xlabel_time     = "Time [ms]"
+xlabel_drive    = r"Mean drive $\mu_{pre}$ [pA]"
+xlabel_stimulus = "# of stimulus pulses"
 
-xlabel_time = "Time [ms]"
-ylabel_fr   = "FR [Hz]"
+ylabel_fr       = "FR [Hz]"
+ylabel_reaction = "Reaction time [ms]"
+ylabel_recovery = "Recovery time [ms]"
 
-xlabel_drive = r"Mean drive $\mu_{pre}$"
-ylabel_recovery = "Recovery Time [ms]"
+marker_mean_recovery = "p"
+marker_median_recovery = "*"
 
-
-
-############ LIMITS #########################
-max_delay = 75
-
-
+#===============================================================================
+# rcParams and styles
+#===============================================================================
 rcParams["axes.spines.top"] = False
 rcParams["axes.spines.right"] = False
 rcParams["axes.labelpad"] = 2
 rcParams["errorbar.capsize"] = 2
 rcParams["font.size"] = 8
 rcParams["legend.fontsize"] = 7
-rcParams["legend.markerscale"] = 0.7
-rcParams["legend.handlelength"] = 1.5
+rcParams["legend.markerscale"] = 1
+rcParams["legend.handlelength"] = 1.8
 rcParams["legend.columnspacing"] = 1
 rcParams["legend.handletextpad"] = .6
 rcParams["legend.labelspacing"] = .1
@@ -62,6 +75,8 @@ rcParams["legend.framealpha"] = 1
 rcParams["xtick.major.pad"] = 2
 rcParams["ytick.major.pad"] = 2
 
+rcParams["figure.titlesize"] = "x-large"
+
 
 title_style = {
     "fontsize": rcParams["axes.titlesize"],
@@ -69,4 +84,13 @@ title_style = {
     "fontfamily": rcParams["font.family"],
     "ha": "center",
     "va": "center"
+}
+
+quiver_style = {
+    "angles": "xy",
+    "scale_units": "xy",
+    "scale": 1,
+    "units": "xy",
+    "headaxislength": 4,
+    "headlength": 4,
 }

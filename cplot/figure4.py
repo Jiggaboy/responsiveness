@@ -27,6 +27,7 @@ from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, 
 
 from lib.analysis import bootstrap, get_tbins, get_tstart
 from lib.responsehdf5 import ResponseHdf5, get_run_ids, exc_tag, inh_tag
+from lib.rnn import RNN
 from lib.util import save_figure
 
 from cplot.constants import *
@@ -49,6 +50,7 @@ force = False
 
 pre_FR  =  5.
 post_FR = 10.
+FR_I = pre_FR
 # post_FR = 12.
 
 J = 0.025
@@ -62,6 +64,7 @@ means = np.arange(220, 320+1, 40.)
 
 plot_mean = 260.
 # plot_mean = 220.
+Imean_ext = 260.
 
 ### Control FF Network
 # Equivalent for network with J = 0.25
@@ -163,7 +166,6 @@ def main(params:object, control:object):
                         names=["tag", "mean", "bootstrap_id"]
                     )
                     delays.append(new_rows)
-        
                     
                 
                     # Extend the array of firing rates
@@ -209,9 +211,22 @@ def main(params:object, control:object):
         bottom=0.06,
         top=0.93,
         wspace=0.3,
-        hspace=1,
+        hspace=0.85,
     )      
     
+    
+    
+    
+    ax = fig.add_subplot(gs[0, 2])
+    ax.set(
+        title="Set Points", 
+        xlabel=label_drive_mean, ylabel=label_drive_std,
+    )
+    ax.set_xticks([172.5, 260.])
+    # ax.set_yticks([172.5, 260.])
+    
+    rnn = RNN(params, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
+    quiver_setpoints(ax, rnn, plot_mean)
     
     #===============================================================================
     ## FIRING RATE
@@ -226,8 +241,8 @@ def main(params:object, control:object):
     }
     plot_kwargs = {"markersize": 2}
     
-    ax = fig.add_subplot(gs[0, 2])
-    title = f"Activity over Time" + "\n"
+    ax = fig.add_subplot(gs[1, 0])
+    title = f"Activity over Time" + "\n" + "\n"
     ax.set(title=title, **ax_kwargs)
     plot_axvline_at_change(params, control, ax)
     ax.set(xlim=xlim_time)
@@ -265,8 +280,8 @@ def main(params:object, control:object):
 
     #===============================================================================
     ## DELAY OVER MEAN -- VIOLIN
-    ax_transient = fig.add_subplot(gs[1, 0])
-    title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})"
+    ax_transient = fig.add_subplot(gs[1, 1])
+    title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})" + "\n"
 
     ax_transient.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(means)
@@ -287,27 +302,40 @@ def main(params:object, control:object):
     for tag in hue_order:
         handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
     ax_transient.legend(handles=handles)
+    sns.move_legend(ax_transient, "upper center", ncols=3)
     
-
-    #===============================================================================
-    ## DELAY OVER MEAN -- MEAN AND MEDIAN
-    title = f"Mean Recovery Time" + "\n"
-    ax_mean_delay = fig.add_subplot(gs[1, 1])
-    ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
-    ax_mean_delay.set_xticks(means)
-
-    sns.lineplot(
-        data=df_delays,
-        x="mean",
-        y="delay",
-        hue="tag",
-        marker="o",
-        errorbar="sd",
-        estimator="mean",
-        hue_order=hue_order,
+    plt.figure()
+    plt.title(title)
+    sns.violinplot(
+        df_delays, x="mean", y="delay", 
+        hue="tag", 
+        cut=0, 
+        density_norm="width", 
+        common_norm=True, 
+        hue_order=hue_order, 
         palette = Color,
-        ax=ax_mean_delay,
+        inner = None,
+        native_scale=True,
     )
+    # #===============================================================================
+    # ## DELAY OVER MEAN -- MEAN AND MEDIAN
+    # title = f"Mean Recovery Time" + "\n"
+    # ax_mean_delay = fig.add_subplot(gs[1, 1])
+    # ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
+    # ax_mean_delay.set_xticks(means)
+    #
+    # sns.lineplot(
+    #     data=df_delays,
+    #     x="mean",
+    #     y="delay",
+    #     hue="tag",
+    #     marker="o",
+    #     errorbar="sd",
+    #     estimator="mean",
+    #     hue_order=hue_order,
+    #     palette = Color,
+    #     ax=ax_mean_delay,
+    # )
     # sns.lineplot(
     #     data=df_delays,
     #     x="mean",
@@ -322,39 +350,36 @@ def main(params:object, control:object):
     #     ax=ax_mean_delay,
     # )
     
-    labels = []
-    # for stat in ("mean", "median"):
-    for stat in ("mean", ):
-        for tag in hue_order:
-            labels.append(rf"{stat.capitalize()}")
-            # labels.append(rf"{stat.capitalize()} ({Label[tag]})")
-    handles, _ = ax_mean_delay.get_legend_handles_labels()
-    ax_mean_delay.legend(handles, labels)
+    # labels = []
+    # # for stat in ("mean", "median"):
+    # for stat in ("mean", ):
+    #     for tag in hue_order:
+    #         labels.append(rf"{stat.capitalize()}")
+    #         # labels.append(rf"{stat.capitalize()} ({Label[tag]})")
+    # handles, _ = ax_mean_delay.get_legend_handles_labels()
+    # ax_mean_delay.legend(handles, labels)
+    
     
     #===============================================================================
-    ## COEFFICIENT OF VARIATION
+    ## FANO FACTOR
     #===============================================================================
     t_start = get_tstart(params)
     buffer = 0.2
     index = (t_bins >= t_start + buffer * params.duration_post).argmax() - 1 # Gets first value that is larger than t_start
     
-    
-    
-    
     # df_Erates, t_bins
     Erates_mean = df_Erates.loc[:, index:].mean(axis=1)
-    Erates_std  = df_Erates.loc[:, index:].std(axis=1)
-    
+    Erates_std  = df_Erates.loc[:, index:].var(axis=1) # Fano Factor is var, std is coefficient of variation (CV)
     
     Erates_CV = Erates_std / Erates_mean
-    Erates_CV = Erates_CV.reset_index(name="CV")
+    Erates_CV = Erates_CV.reset_index(name="FF") 
     
-    title = "Coefficient of Variation" + "\n"
-    ax_CV = fig.add_subplot(gs[1, 2])
-    ax_CV.set(ylabel=xlabel_drive, xlabel="CV", title=title)
+    title = "Fano Factor" + "\n"
+    ax_CV = fig.add_subplot(gs[2, 2])
+    ax_CV.set(ylabel=xlabel_drive, xlabel="FF", title=title)
     ax_CV.set_yticks(means)
     sns.violinplot(
-        Erates_CV, x="CV", y="mean", 
+        Erates_CV, x="FF", y="mean", 
         hue="tag", 
         cut=0, 
         density_norm="width", 
@@ -378,31 +403,58 @@ def main(params:object, control:object):
     #===============================================================================
     tmp_tag = "std"
     
-    ax_raster = fig.add_subplot(gs[2, 0])
-    ax_raster.set(xlabel = xlabel_time, 
-                  ylabel = "Neuron ID", 
-                  xlim = (1000, 1050),
-                  title = f"Raster Plot\n(" + r"$\mu_{pre}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
-                  )
+    ax_raster = fig.add_subplot(gs[1, 2])
+    ax_raster.set(
+        xlabel = xlabel_time, 
+        ylabel = "Neuron ID", 
+        xlim = (1155, 1205),
+        ylim = (0, 6250),
+        title = f"Raster Plot\n(" + r"$\mu_{pre}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
+    )
+    ax_raster.set_xticks([1160, 1180, 1200])
     ax_raster.ticklabel_format(axis="y", style="scientific", scilimits=(0, 2), useMathText=True)
     
+    # xlim_buffer = 15
+    # xlim_pre  = np.asarray([200, 250])
+    # xlim_post = np.asarray([1200, 1250])
     
+    # xlim_low = xlim_pre[0] - xlim_buffer
+    # xlim_pre_diff = xlim_pre[1]-xlim_pre[0]
+    # xlim_post_diff = xlim_post[1]-xlim_post[0]
+    
+    
+    # fig, ax_sca = plt.subplots()
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=plot_mean)
         run_ids = get_run_ids(rows, params, tmp_tag)
         target = hfile.get_node(hfile.data, f"run{run_ids[0]}")
         
         for subgroup in (exc_tag, inh_tag):
-            color = "#78001A" if subgroup == exc_tag else "#004791"
+            color = EXC_NEURON if subgroup == exc_tag else INH_NEURON
             
             subtarget = target[subgroup]
             spike_times = subtarget.spikes.read()
             senders     = subtarget.senders.read()
             
-            ax_raster.scatter(spike_times, senders, color=color, marker=".", s=1)
+            ax_raster.scatter(spike_times, senders, color=color, marker=",", s=1)
+            # mask_pre = np.logical_and(spike_times > xlim_pre[0] - xlim_buffer, spike_times < xlim_pre[1] + xlim_buffer)
+            # ax_raster.scatter(spike_times[mask_pre], senders[mask_pre], color=color, marker=",", s=1)
+            #
+            # mask_post = np.logical_and(spike_times > xlim_post[0] - xlim_buffer, spike_times < xlim_post[1] + xlim_buffer)
+            # xshift = xlim_post[0] - xlim_pre[1] - 2 * xlim_buffer
+            # ax_raster.scatter(spike_times[mask_post] - xshift, senders[mask_post], color=color, marker=",", s=1)
+            #
+            #
+            # ax_sca.scatter(spike_times, senders, color=color, marker=",", s=1)
+            # senders_tmp = np.copy(senders)
+            # np.random.shuffle(senders_tmp)
+            # ax_sca.scatter(spike_times, senders_tmp + 1 * 7500, color=color, marker=",", s=1)
+            # ax_sca.scatter(spike_times, np.random.shuffle(senders) + 2 * 7500, color=color, marker=",", s=1)
+    # ax_raster.set_xlim(xlim_low, xlim_low + xlim_pre_diff + xlim_post_diff + 3 * xlim_buffer)
+    # ax_raster.set_xticks([*xlim_pre, *(xlim_pre + xlim_pre_diff + 2 * xlim_buffer)], [*xlim_pre, *xlim_post])
+    # ax_raster.axvline(xlim_pre[1] + xlim_buffer, c="white", lw=2)
     
-        
-    
+    # return 
     #===============================================================================
     ## CONTROL NETWORK
     #===============================================================================
@@ -447,7 +499,7 @@ def main(params:object, control:object):
     df_metrics = pd.concat(all_metrics)
         
     
-    ax_control = fig.add_subplot(gs[2, 1])
+    ax_control = fig.add_subplot(gs[2, 0])
     title = "Feedforward Control" + "\n"
     ax_control.set(title=title, **ax_kwargs)
     plot_axvline_at_change(params, control, ax_control)
@@ -470,7 +522,7 @@ def main(params:object, control:object):
     # PLOT - TRANSIENT ESTIMATES
     #=============================================================================== 
 
-    ax_control_recovery = fig.add_subplot(gs[2, 2])
+    ax_control_recovery = fig.add_subplot(gs[2, 1])
 
     title = f"Recovery Time (Control)" + "\n"
     xticks = [exp[mean_tag][0] for exp in exps]
@@ -487,13 +539,27 @@ def main(params:object, control:object):
         palette = Color,
         inner = None,
         native_scale=True,
+        legend = None,
     )
-    handles = []
-    for tag in hue_order:
-        handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
-    ax_control_recovery.legend(handles=handles)
+    # handles = []
+    # for tag in hue_order:
+    #     handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
+    # ax_control_recovery.legend(handles=handles)
+    # sns.move_legend(ax_control_recovery, "upper center", ncols=3)
     
-    
+    plt.figure()
+    plt.title(title)
+    sns.violinplot(
+        df_metrics, x="mean", y="delay", 
+        hue="tag", 
+        cut=0, 
+        density_norm="width", 
+        common_norm=True, 
+        hue_order=hue_order,
+        palette = Color,
+        inner = None,
+        native_scale=True,
+    )
     
         #
         # figname_transient_means = f"Mean delay estimates (FR: {pre_FR} to {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
@@ -539,6 +605,75 @@ def main(params:object, control:object):
 #===============================================================================
 # METHODS
 #===============================================================================
+
+def quiver_setpoints(ax:object, rnn:RNN, mean:float):
+    for delta in (mean_tag, std_tag, mean_std_tag):
+        rnn.set_up_network(mean, delta=delta)
+        
+        # plt.scatter(x, y, s, c, marker, cmap, norm, vmin, vmax, alpha, linewidths)
+        # Start: FF
+        ax.scatter(rnn.pre_drive_Emean, rnn.pre_drive_Estd, c=KTH_grey, zorder = 10,
+            s = 5,)
+        # EE contribution
+        ax.quiver(
+            rnn.pre_drive_Emean, rnn.pre_drive_Estd, 
+            rnn.pre_EE_mean, rnn.pre_EE_std,
+            color=EXC_NEURON,
+            zorder = 5,
+            **quiver_style,
+        )
+        # EI contribution
+        ax.quiver(
+            rnn.pre_drive_Emean + rnn.pre_EE_mean, rnn.pre_drive_Estd + rnn.pre_EE_std,
+            rnn.pre_EI_mean, rnn.pre_EI_std,
+            color=INH_NEURON,
+            zorder = 4,
+            **quiver_style,
+        )
+        
+        # Start: Pre
+        ax.scatter(
+            *rnn.pre_Esetpoint,
+            c = KTH_grey,
+            zorder = 10,
+            s = 5,
+        )
+        #####################################################################################
+        if delta == mean_tag:
+            color = Color[std_tag]
+        elif delta == std_tag:
+            color = Color[mean_tag]
+        else:
+            color = Color[mean_std_tag]
+        
+        deltaEE_mean = rnn.post_EE_mean - rnn.pre_EE_mean
+        deltaEE_std  = rnn.post_EE_std - rnn.pre_EE_std
+        
+        # Delta Generator
+        ax.quiver(
+            *rnn.pre_Esetpoint,
+            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0] - deltaEE_mean, rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1] - deltaEE_std,
+            color=KTH_grey,
+            zorder = 2,
+            **quiver_style,
+        )
+        
+    
+        ax.quiver(
+            rnn.post_Esetpoint[0] - deltaEE_mean, rnn.post_Esetpoint[1] - deltaEE_std,
+            deltaEE_mean, deltaEE_std,
+            color=EXC_NEURON,
+            zorder = 5,
+            **quiver_style,
+        )
+        
+        ax.quiver(
+            *rnn.pre_Esetpoint,
+            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0], rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1],
+            color=color,
+            zorder = 4,
+            **quiver_style,
+        )
 
 
 

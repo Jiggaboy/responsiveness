@@ -40,7 +40,8 @@ figsize = (17.6*cm, 15*cm)
 fname = "figure2_recovery"
 
     
-ylim_delay = (0, 85)
+ylim_delay = (0, 95)
+ylim_delay_example = (0, 58)
 FR_lim = (0, 12)
 
 force = False
@@ -181,7 +182,7 @@ def main():
     ax_kwargs = {
         "xlabel": xlabel_time, "ylabel": ylabel_fr, "ylim": FR_lim,
         "xlim": xlim_time,
-        "yticks": np.arange(*FR_lim, 3),
+        "yticks": np.arange(*FR_lim, 2),
     }    
     axt_kwargs = {
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
@@ -190,7 +191,7 @@ def main():
     plot_kwargs = {"markersize": 2}
     for i, fr in enumerate(FRs_to_plot):
         ax = fig.add_subplot(gs[0, i])
-        title = f"Activity over Time\n(FR: {pre_FR}Hz" + r"$\rightarrow$" + f"{fr}Hz)"
+        title = f"Activity over Time\n(FR: {pre_FR:.0f}Hz" + r"$\rightarrow$" + f"{fr:.0f}Hz)"
         if i == 0:
             ax.set(title=title, **ax_kwargs)
         else:
@@ -226,10 +227,10 @@ def main():
     
     ax_transient = fig.add_subplot(gs_delays[0, 0])
     post_FR = FRs_to_plot[0]
-    title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})"
+    title = f"Recovery Time\n(FR: {pre_FR:.0f}Hz" + r"$\rightarrow$" + f"{post_FR:.0f}Hz)"
     
 
-    ax_transient.set(ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
+    ax_transient.set(ylabel=ylabel_recovery, ylim=ylim_delay_example, title=title)
     ax_transient.set_xticks(ticks=np.arange(len(means)), labels=means)
     df_tmp = df_delays.xs(post_FR, level="post_FR")
     sns.violinplot(df_tmp, x="mean", y="delay", hue="tag", 
@@ -243,21 +244,21 @@ def main():
     handles = []
     for tag in hue_order:
         handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
-    plt.legend(handles=handles)
+    plt.legend(handles=handles, ncols=3)
     
 
     # ax_mean_delay = fig.add_subplot(gs[1, 0])
     ax_mean_delay = fig.add_subplot(gs_delays[1, 0])
-    title = f"Mean Recovery Time\n(FR: {pre_FR} to {post_FR})"
-    ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
+    title = "Mean " + title
+    ax_mean_delay.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay_example, title=title)
 
     sns.lineplot(
         data=df_tmp,
         x="mean",
         y="delay",
         hue="tag",
-        marker="o",
-        errorbar="sd",
+        marker=marker_mean_recovery,
+        errorbar=None,
         estimator="mean",
         hue_order=hue_order,
         ax=ax_mean_delay,
@@ -268,9 +269,9 @@ def main():
         x="mean",
         y="delay",
         hue="tag",
-        marker="^",
+        marker=marker_median_recovery,
         linestyle="--",
-        # errorbar=("pi", 50),
+        errorbar=None,
         estimator="median",
         hue_order=hue_order,
         ax=ax_mean_delay,
@@ -283,7 +284,7 @@ def main():
             # labels.append(rf"{stat.capitalize()} delay ({Label[tag]})")
             labels.append(rf"{stat.capitalize()}")
     handles, _ = ax_mean_delay.get_legend_handles_labels()
-    ax_mean_delay.legend(handles, labels, ncols=2)
+    ax_mean_delay.legend(handles, labels, ncols=2, loc="upper left")
     
 
     #===============================================================================
@@ -333,16 +334,20 @@ def main():
     ax_response_std  = fig.add_subplot(gs_kernel[1])
     ax_response_both = fig.add_subplot(gs_kernel[2])
         
-    ax_kwargs = {"ylim": ylim_delay, 
-                 "yticks": np.arange(ylim_delay[0], ylim_delay[1]+15, 20), 
-                 "xticks": means[::2]}
+    xbuffer = 5
+    ax_kwargs = {
+        "ylim": ylim_delay, 
+        "yticks": np.arange(ylim_delay[0], ylim_delay[1]+15, 20), 
+        "xlim": (means[0] - xbuffer, means[-1] + xbuffer),
+        "xticks": means[::2],
+    }
     title = "Mean Recovery Time"
     for tag, gb in df_delays.groupby(level="tag"):
-        if tag == mean_tag:
+        if tag == std_tag:
             ax = ax_response_mean
             ax.tick_params(labelbottom=False)
             ax.set(title=title)
-        elif tag == std_tag:
+        elif tag == mean_tag:
             ax = ax_response_std
             ax.tick_params(labelbottom=False)
             ax.set_ylabel(ylabel_recovery)
@@ -356,8 +361,11 @@ def main():
         under_tag = "under"
         over_tag  = "over"
         osc_tag   = "osc"
-        kcolor = {under_tag: KTH_sky, over_tag: KTH_blue, osc_tag: KTH_navy}
+        markersize = 10
+        kcolor = {under_tag: CUNDERSHOOT, over_tag: COVERSHOOT, osc_tag: COSCILLATORY}
+        # kcolor = {under_tag: KTH_sky, over_tag: KTH_blue, osc_tag: KTH_navy}
         kmarker = {under_tag: "v", over_tag: "^", osc_tag: "$\sim$"}
+        klabel = {under_tag: "undershoot", over_tag: "overshoot", osc_tag: "damped osc."}
         for post_FR, gb_fr in gb.groupby(level=("post_FR")):
             gb_delay = gb_fr.groupby(level=("mean")).mean()
             values = gb_delay.reset_index()
@@ -371,8 +379,13 @@ def main():
             for idx, row in values.iterrows():
                 ax.scatter(row["mean"], row["delay"],
                             marker=kmarker[kernel_max_idx[idx]],
-                            alpha=kernel_max[idx], c=kcolor[kernel_max_idx[idx]], s=10,
+                            alpha=kernel_max[idx], c=kcolor[kernel_max_idx[idx]], s=markersize,
                             zorder=10)
+        # Add legend
+        if tag == mean_tag:
+            for key in kcolor.keys():
+                ax.scatter(-100, -100, marker=kmarker[key], c=kcolor[key], s=markersize, label=klabel[key].capitalize())
+            ax.legend()
 
             
             

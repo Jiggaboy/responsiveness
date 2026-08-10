@@ -39,6 +39,7 @@ from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 #===============================================================================
 figsize = (17.6*cm, 15*cm)
 fname = "figure3_stimulus"
+fname_stim = "suppfigure2_stimulus"
 
 force = False
 # force = True
@@ -46,22 +47,22 @@ force = False
 control, params = load_config(no_stim=True)
 xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 65)
 xlim_extendedtime = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 125)
-ylim_recovery = (0, 90)
-# ylim_recovery = (15, 40)
-yticks_recovery = np.arange(0, 100, 25)
+ylim_recovery           = (0, 75)
+ylim_recovery_extended  = (0, 90)
+
+yticks_recovery = np.arange(0, 200, 20)
 ylim_FR = (0, 15)
+
 ylabel_recovery = "Recovery Time [ms]"
 ylabel_fr = "FR [Hz]"
 xlabel_drive = r"Mean drive $\mu_{pre}$"
 
-marker_up = "^"
-marker_down = "v"
+marker_up   = "." #"$\u2191$"
+marker_down = (4, 1, 0) #"$\u2193$"
 marker = (marker_up, marker_down)
 ls_up = "solid"
-ls_down = "dashed"
+ls_down = ":"
 lss = (ls_up, ls_down)
-
-duration_marker = ["1", "x", "+"]
     
 pre_FR_up = 5
 post_FR_up = 10
@@ -79,13 +80,13 @@ samples_per_strap = 50
     
 
 means = np.asarray([220., 260., 300.])
-means = np.arange(220, 320+1, 20.)
+means = np.arange(220, 320+1, 40.)
 # means = np.arange(220, 320+1, 20.)
 
 
 plot_mean = 260.
 # plot_mean = 240.
-xticks_mean = means[::2]
+xticks_mean = means[::]
 
 fn_id    = f"_{pre_FR_up}"
 fn_rate  = "stim_dfrate" + fn_id
@@ -285,7 +286,6 @@ def main():
     # PLOTS - Up and down step
     #===============================================================================
     fig = plt.figure(figsize=figsize)
-    # gs = fig.add_gridspec(nrows=4, ncols=3)
     gs = fig.add_gridspec(nrows=4, ncols=3)
     fig.subplots_adjust(
         left=0.06,
@@ -304,7 +304,6 @@ def main():
         "ylabel": "Density of delays", "yticks": np.linspace(0, 0.5, 3), "ylim": (0, 0.5),
     }
     
-    # for idx, (pre_FR, post_FR) in enumerate(zip((pre_FR_down, pre_FR_up, ), (post_FR_down, post_FR_up, ))):
     for idx, (pre_FR, post_FR) in enumerate(zip((pre_FR_up, pre_FR_down), (post_FR_up, post_FR_down))):
         df_rates_tmp  = df_rates.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
         df_delays_tmp = df_delays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
@@ -334,12 +333,15 @@ def main():
    
 
     ax = fig.add_subplot(gs[:1, 2])
-    ax.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_recovery, xticks=xticks_mean)
+    ax.set(
+        xlabel=xlabel_drive, 
+        ylabel=ylabel_recovery, 
+        ylim=ylim_recovery_extended, 
+        xticks=xticks_mean
+    )
     ax.set_title("Recovery Time\n")
     
     for idx, (pre_FR, post_FR, mark, ls) in enumerate(zip((pre_FR_up, pre_FR_down), (post_FR_up, post_FR_down), marker, lss)):
-    # for idx, (pre_FR, post_FR, mark, ls) in enumerate(zip((pre_FR_up, ), (post_FR_up, ), marker[::1], lss[::1])):
-    # for idx, (pre_FR, post_FR, mark, ls) in enumerate(zip((pre_FR_down, pre_FR_down), (post_FR_down, ), marker[::-1], lss[::-1])):
         df_delays_tmp = df_delays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
             
         sns.lineplot(
@@ -348,29 +350,17 @@ def main():
             y="delay",
             hue="tag",
             marker=mark,
+            markersize=8,
+            # markeredgecolor="k",
             linestyle=ls,
             errorbar=None,
             estimator="mean",
             hue_order=hue_order,
             palette=Color,
             ax=ax,
-            alpha=0.75,
         )
-        # sns.lineplot(
-        #     data=df_delays_tmp,
-        #     x="mean",
-        #     y="delay",
-        #     hue="tag",
-        #     marker="^",
-        #     linestyle="--",
-        #     # errorbar=("pi", 50),
-        #     estimator="median",
-        #     hue_order=hue_order,
-        #     ax=ax_mean_delay,
-        # )
-    
+        
     labels = []
-    # for stat in ("\N{DOWNWARDS ARROW}"):
     for stat in ("\N{UPWARDS ARROW}", "\N{DOWNWARDS ARROW}"):
         for tag in hue_order:
             labels.append(rf"Mean ({stat})")
@@ -405,7 +395,7 @@ def main():
     
         # ax = fig.add_subplot(gs[s+1, 0])
         ax = fig.add_subplot(gs_activity[s])
-        title = "Activity over Time\n" + f"({stim_rep} stimulation" + "s" * (stim_rep.item() > 1) + ")"
+        title = "Activity over Time\n" + f"({stim_rep} stimulation pulse" + "s" * (stim_rep.item() > 1) + ")"
         ax.set(title=title, **ax_kwargs)
         
         if s == 2:
@@ -449,27 +439,19 @@ def main():
         
         # ax = fig.add_subplot(gs_recovery[0, 0])
         
-        
-        
-        # for idx, (stim_duration, mark) in enumerate(zip(stim_durations, duration_marker)):
+
         df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR, stim_rep), level=("pre_FR", "post_FR", "stim_reps"))
         
         ax_response_mean = fig.add_subplot(gs_recovery[s, 0])
         ax_response_std  = fig.add_subplot(gs_recovery[s, 1])
         ax_response_both = fig.add_subplot(gs_recovery[s, 2])
-        # ax_response_mean = fig.add_subplot(gs_recovery[0, s])
-        # ax_response_std  = fig.add_subplot(gs_recovery[1, s])
-        # ax_response_both = fig.add_subplot(gs_recovery[2, s])
-            
-        # ax_kwargs = {"ylim": ylim_recovery, "ylabel": ylabel, 
-        #              "yticks": np.arange(ylim_recovery[0], ylim_recovery[1]+15, 20), 
-        #              "xticks": means[::2]}
-        title = f"Recovery Time\n({stim_rep} stimulation" + "s" * (stim_rep.item() > 1) + ")" #+ 
+        
+        title = f"Recovery Time\n({stim_rep} stimulation pulse" + "s" * (stim_rep.item() > 1) + ")" #+ 
         for tag, gb in df_delays_tmp.groupby(level="tag"):
-            if tag == mean_tag:
+            if tag == std_tag:
                 ax = ax_response_mean
                 ax.set_ylabel(ylabel_recovery)
-            elif tag == std_tag:
+            elif tag == mean_tag:
                 ax = ax_response_std
                 ax.set(title=title)
                 ax.tick_params(labelleft=False)
@@ -484,10 +466,10 @@ def main():
             else:
                 ax.tick_params(labelbottom=False)
                 
-            ax.set(ylim=ylim_recovery, xticks=xticks_mean, yticks=yticks_recovery)
+            ax.set(xticks=xticks_mean, yticks=yticks_recovery)
+            ax.set(ylim=ylim_recovery)
         
-        
-            sns.lineplot(
+            lp = sns.lineplot(
                 # data=df_delays_tmp,
                 data=gb,
                 x="mean",
@@ -495,7 +477,6 @@ def main():
                 style="stim_duration",
                 # hue="tag",
                 markers=True,
-                # markers=duration_marker,
                 linestyle=ls,
                 errorbar=None,
                 estimator="mean",
@@ -504,14 +485,15 @@ def main():
                 # palette=Color,
                 color = Color[tag],
             )
+            lp.legend_.remove()
             
+            if s == 0:
+                labels = []
+                handles, legend_labels = ax.get_legend_handles_labels()
+                for label in legend_labels:
+                    labels.append(rf"{int(float(label))}ms")
+                ax.legend(handles, labels, ncols=2, alignment="right")
         
-            labels = []
-            handles, legend_labels = ax.get_legend_handles_labels()
-            for label in legend_labels:
-                labels.append(rf"{int(float(label))}ms")
-            ax.legend(handles, labels, ncols=2, alignment="right")
-    
     save_figure(fname, fig, is_latex=True)
     
     
@@ -519,35 +501,43 @@ def main():
     fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(nrows=3, ncols=3)
     fig.subplots_adjust(
-        left=0.06,
-        right=0.98,
+        left=0.07,
+        right=0.99,
         bottom=0.08,
         top=0.93,
-        wspace=0.25,
-        hspace=.3,
+        wspace=0.15,
+        hspace=.45,
     )
     df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
     df_delays_tmp = df_delays_tmp[df_delays_tmp.index.isin(means[::1], level="mean")]
     
-    
+    xlim_stimbuffer = 0.5
+    ax_kwargs = {
+        "xlim": (stim_reps[0] - xlim_stimbuffer, stim_reps[-1] + xlim_stimbuffer),
+        "ylim": (0, 46),
+    }
     for i, ((tag, mean), gb) in enumerate(df_delays_tmp.groupby(level=("tag", "mean"))):
+        print(i, tag, mean)
+        title = f"Stimulus Modality {Label[tag]}"
+        title_details = "\n" + r"$\mu_{pre}$=" + f"{mean:.0f}pA"
         
-        title = f"{tag} is constant"
-        
-        if tag == mean_tag:
+        if tag == std_tag:
             ax = fig.add_subplot(gs[0, i%3])
-            ax.set_ylabel(ylabel_recovery)
+            ax.set_xticks(stim_reps)
             ax.tick_params(labelbottom=False)
-        elif tag == std_tag:
+        elif tag == mean_tag:
             ax = fig.add_subplot(gs[1, i%3])
+            ax.set_xticks(stim_reps)
             ax.tick_params(labelbottom=False)
         elif tag == mean_std_tag:
             ax = fig.add_subplot(gs[2, i%3])
+            ax.set_xticks(stim_reps)
+            ax.set_xlabel(xlabel_stimulus)
+            
         else:
             raise ValueError
+        ax.set(**ax_kwargs)
         
-        if (i%3) == 1:
-            ax.set(title=title)
 
         sns.lineplot(
             data = gb,
@@ -560,6 +550,29 @@ def main():
             ax = ax,
             color = Color[tag],
         )
+        
+        
+        if (i%3) == 1:
+            ax.set(title=title + title_details)
+        else:
+            ax.set(title=title_details)
+            
+            
+        if (i%3) == 0:
+            ax.set_ylabel(ylabel_recovery)
+            
+            labels = []
+            handles, legend_labels = ax.get_legend_handles_labels()
+            for label in legend_labels:
+                labels.append(rf"{int(float(label))}ms")
+            ax.legend(handles, labels, ncols=2, alignment="right")
+        else:
+            ax.set_ylabel("")
+            ax.tick_params(labelleft=False)
+            ax.legend_.remove()
+            
+            
+    save_figure(fname_stim, fig, is_latex=True)
         
 #===============================================================================
 if __name__ == '__main__':

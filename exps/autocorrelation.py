@@ -27,26 +27,34 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
+from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
 from config import load_config
 import lib.nest_interface as nif
-from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
+from lib.analysis import bootstrap, get_tbins, get_tstart
+from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
-from lib.analysis import get_transient
 
-from lib.conversion import spikecount_to_FR
+from cplot.constants import *
+from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 
 #===============================================================================
 # CONTROL VARIABLES
 #===============================================================================
 
+figsize = (17.6*cm, 10*cm)
+fname = "suppfigure3_autocorrelation"
+
+xlabel_acf = "Time lag [ms]"
+ylabel_acf = "Correlation coefficient"
+ax_kwargs = {
+    "xlim": (0, 50),
+    "ylim": (-0.25, 1.),
+}
 plot_rate_and_delays = True
 plot_rate_and_delays = False
-
-hue_order = [mean_tag, std_tag, mean_std_tag]
 
 ylim_delay = (0, 125)
 
@@ -55,114 +63,111 @@ ylim_delay = (0, 125)
 #===============================================================================
 hist_binwidth = 2. #ms
 
-bootstraps = 50     #50
-samples_per_strap = 25 #25
+bootstraps          = 10
+samples_per_strap   = 50
+
+
+pre_FR = 2.
+post_FR = 4.
+
+pre_FR = 5.
+post_FR = 10.
+
+means = np.arange(220, 320+1, 20.)
+# means = np.arange(240, 290+1, 10.)
+# means = np.append(means, 320.)
+
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
-@functimer  # .6s per seed (25 straps x 10 samples)
+@functimer
 def main():
-    control, params = load_config()
-    t_bins = np.arange(0., params.duration_pre + params.duration_post + hist_binwidth, float(hist_binwidth)) + params.warmup
+    control, params = load_config(is_network=False, no_stim=True)
+    base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
     
-    pre_FR = 2.
-    post_FR = 4.
-    
-    pre_FR = 5.
-    post_FR = 10.
-    
-    # pre_FR = 4.
-    # # # post_FR = 6.
-    # post_FR = 12.
-    #
-    # pre_FR = 10.
-    # post_FR = 5.
-    means = np.arange(220, 320+1, 140.)
-    # means = np.arange(240, 290+1, 10.)
-    # means = np.append(means, 320.)
 
-    
-    with ResponseHdf5(params.filename, "a", metadata=params.metadata) as hfile:
-        #===============================================================================
-        # MORE METHODS
-        #===============================================================================    
-        all_rates = []
-    
-        ##### ALL ANALYSES ######################################
+    all_metrics = []
+    all_rates = []
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for tag in (mean_tag, std_tag, mean_std_tag):
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
-                if tag in (mean_tag, std_tag):
-                    rows_filtered = rows[rows[f"pre_{tag}"] == rows[f"post_{tag}"]] 
-                elif tag == mean_std_tag:
-                    mask = np.logical_and(rows[f"pre_{mean_tag}"] != rows[f"post_{mean_tag}"], rows[f"pre_{std_tag}"] != rows[f"post_{std_tag}"])
-                    rows_filtered = rows[mask]
-                else:
-                    raise ValueError("No valid tag given...")
-
-                stim_mask = np.logical_and(rows_filtered["stim_duration"] == params.stim_duration, 
-                                           rows_filtered["break_duration"] == params.break_duration, 
-                                           rows_filtered["stim_reps"] == params.stim_reps)
-                rows_filtered = rows_filtered[stim_mask]
-                run_ids = rows_filtered[id_tag]
-
+                run_ids = get_run_ids(rows, params, tag)
+                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
     
-                # Detailed feature analysis
-                t_start = params.warmup + params.duration_pre
-                index = (t_bins >= t_start).argmax() # Gets first value that is larger than duration_pre + warmup                    
-                population_FR   = np.zeros((bootstraps, t_bins.size-index-1))
-                for b in range(bootstraps):
-                    np.random.shuffle(run_ids)
-                    samples = run_ids[:samples_per_strap] # Bootstrapping
+                start_index = (t_bins > get_tstart(params)).argmax()
     
-                    # DELAY 
-                    spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins)
-                    
-                    # FIRING RATE
-                    FRs = spikecount_to_FR(spikecounts_all_runs.mean(axis=0)[index:], params.N, hist_binwidth)
-                    population_FR[b] = FRs              
-
+                new_rows = pd.DataFrame({delay_tag: delay_estimates,})
+                new_rows.index = pd.MultiIndex.from_product(
+                    [[tag], [mean], range(len(delay_estimates))],
+                    names=["tag", "mean", "bootstrap_id"]
+                )
+                all_metrics.append(new_rows)
+    
                 # Extend the array of firing rates
-                new_rows = pd.DataFrame(population_FR)
+                new_rows = pd.DataFrame(population_FR[:, start_index-1:]) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
                     [[tag], [mean], range(population_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 all_rates.append(new_rows)
+    
     df_rates = pd.concat(all_rates)
+    df_delays = pd.concat(all_metrics)
     
-    plt.figure("Autocorrelation")
-    plt.xlabel("time")
-    plt.ylabel("FR")
-    
-    for m, mean in enumerate(means): 
-        # for tag in (mean_tag, std_tag, mean_std_tag):
-        #     label = Label[tag]
-        #     color = Color[tag]
-            
-            # df = df_rates.xs((mean, tag), level=("mean", "tag"))
-            # plt.plot(t_bins[index+1:]-t_start, df.T)
-            
-        df = df_rates.xs(mean, level=("mean"))
-        df.reset_index()
 
-             
+    
+    fig = plt.figure(figsize=figsize)
+    fig.suptitle("Autocorrelation Functions" + "\n"+ r"FR: $5 \rightarrow 10$Hz")
+    gs = fig.add_gridspec(nrows=2, ncols=3)
+    fig.subplots_adjust(
+        left=0.1,
+        right=0.96,
+        bottom=0.1,
+        top=0.82,
+        wspace=0.2,
+        hspace=0.5
+    )
+    
+    for m, mean in enumerate(means):
+        row = m // 3
+        col = m % 3
+        ax = fig.add_subplot(gs[row, col])
+        
+        title = r"$\mu_{pre}$" + f"={int(mean)}pA"
+        
+        # TODO: Set the Figure title
+        # plt.figure(f"Autocorrelation {mean}")
+        ax.set(title=title, **ax_kwargs, xlabel=xlabel_acf)
+        # if row == 1:
+        #     ax.set(xlabel=xlabel_acf)
+        # elif col == 2:
+        #     ax.set(xlabel=xlabel_acf)
+        # else:
+        #     ax.tick_params(labelbottom=False)
+        if col == 0:
+            ax.set(ylabel=ylabel_acf)
+        else:
+            ax.tick_params(labelleft=False)
+        ax.axhline(0, ls="--", c="k")
+        
+        if m == 5:
+            ax.set(xlim=(0, 130))
+        
+        # Selects only the rows of the currently iterated mean
+        df = df_rates.xs(mean, level=("mean"))
+        
+        # Row: The FR per time points
         acfs = df.apply(lambda row: autocorrelation(row), axis=1)
+        # Expands the tuples into columns, and renames them
         acfs = acfs.apply(pd.Series) 
         acfs.rename(columns={0: "index", 1: "ac"}, inplace=True)
+        acfs["index"] *= hist_binwidth
         
-        # idx = acfs["index"]
-        # values = acfs["ac"]
-        # plt.plot()
-        
-        acfs_2d = pd.DataFrame(
-            np.vstack(acfs['ac'].to_numpy()),
-            index=acfs.index,
-            columns=acfs.iloc[0]['index']   # use the first row's index list as column names
-        )
-        
+        # Converts from having a long list in a single cell to having them in the full column.
         long_acfs = acfs.reset_index().explode(['index', 'ac'])
 
         sns.lineplot(
@@ -170,57 +175,27 @@ def main():
             x="index",
             y="ac",
             hue="tag",
-            marker="o",
-            # errorbar="sd",
-            # estimator="mean",
+            errorbar="sd",
+            estimator="mean",
             hue_order=hue_order,
-            # ax=ax_meandelay,
+            palette=Color,
+            legend=None,
+            ax=ax,
         )
         
         
-        params_df = acfs.apply(fit_row_ordered, axis=1)
-        t = np.asarray(acfs.iloc[0]['index'], dtype=float)
-        
-        fit_df = pd.DataFrame(
-            {
-                idx: double_exp_ordered(
-                    t,
-                    row['w'],
-                    row['tau_fast'],
-                    row['tau_slow']-row['tau_fast'],
-                )
-                for idx, row in params_df.iterrows()
-            },
-        ).T
-        fit_df.index.names = ("tag", "bootstrap_id")
-        
-        # fit_df = params_df.apply(lambda x: double_exp_ordered, axis=1)
-        # fit_df = pd.DataFrame({"fit": }, index=params_df.index)
-        long_fit = (
-            fit_df
-            .stack()
-            .rename("fit")
-            .reset_index()
-            .rename(columns={"level_2": "lag"})
-        )
-        
-        sns.lineplot(
-            data=long_fit,
-            x="lag",
-            y="fit",
-            hue="tag",
-            marker="^",
-            # units="bootstrap_id",
-            # errorbar="sd",
-            # estimator="mean",
-            hue_order=hue_order,
-            # ax=ax_meandelay,
-            linestyle="--",
-        )
+        if row == 0 and col == 1:
+            handles = []
+            for tag in hue_order:
+                handles.extend([mpatches.Patch(facecolor=Color[tag], label=Label[tag])])
+            plt.legend(handles=handles, loc="upper center") # ncols=3?
+            
+            
+    save_figure(fname, fig, is_latex=True)
 #===============================================================================
 # METHODS
 #===============================================================================
-
+# TODO: Normalize correctly!
 def autocorrelation(x, max_lag=None):
     """
     Compute normalized autocorrelation function.
@@ -231,7 +206,7 @@ def autocorrelation(x, max_lag=None):
     acf  : normalized autocorrelation
     """
     x = np.asarray(x, dtype=np.float64)
-    x = x - np.mean(x)
+    x = (x - np.mean(x)) / x.std()
 
     n = len(x)
     if max_lag is None:
@@ -243,8 +218,6 @@ def autocorrelation(x, max_lag=None):
     # unbiased normalization
     norm = np.arange(n, n-max_lag-1, -1)
     corr /= norm
-
-    corr /= corr[0]  # normalize to 1 at lag 0
 
     lags = np.arange(0, max_lag+1)
     return lags, corr

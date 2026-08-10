@@ -136,7 +136,7 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
         samples = np.random.choice(run_ids, samples_per_strap, replace=True)
         
         # SPIKECOUNTS 
-        spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=subgroup)[:-1] # offsetting the last bin to avoid boundary effects.
+        spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=subgroup)[:-2] # offsetting the last bin to avoid boundary effects.
         
         # DELAY ESTIMATION
         SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])

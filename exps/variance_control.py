@@ -58,7 +58,7 @@ ylim_delay = (0, 125)
 # CONSTANTS
 #===============================================================================
 bootstraps        = 100
-samples_per_strap =  15 if is_network else 100
+samples_per_strap =  15 if is_network else 5
 
     
 pre_FR = 2.
@@ -74,14 +74,13 @@ post_FR = 4.
 # pre_FR = 10.
 # post_FR = 5.
 means = np.arange(220, 320+1, 40.)
-means = np.arange(260, 290+1, 110.)
+# means = np.arange(240, 290+1, 110.)
 # means = np.append(means, 320.)
 
 
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
-
 # def main():
 #     control, params = load_config(is_network=is_network)
 #     plt.figure()
@@ -111,7 +110,8 @@ def main():
         #===============================================================================    
         all_metrics = []
     
-        for hist_binwidth in (1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6):
+        # for hist_binwidth in (1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6):
+        for hist_binwidth in (1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6)[::3]:
             params.hist_binwidth = hist_binwidth
             print(f"Binwidth: {params.hist_binwidth}")
             t_bins = get_tbins(params)
@@ -120,14 +120,12 @@ def main():
             #  Get spikes with buffer
             t_start_buffer = t_start + 0.25 * params.duration_post
             index_buffered = (t_bins >= t_start_buffer).argmax() # Index of the first value being larger than the buffered time.
-            
             ##### ALL ANALYSES ######################################
             for tag in (mean_tag, std_tag, mean_std_tag):
                 for m, mean in enumerate(means):
                     logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                     run_ids = get_run_ids(rows, params, tag)
-    
                     
                     
                     subgroup = exc_tag if is_network else None
@@ -135,7 +133,8 @@ def main():
                     
                     stds = population_FR[:, index_buffered:].std(axis=1, ddof=1)
                         
-                    plt.plot(population_FR.std(axis=0, ddof=1), c=Color[tag])
+                    # Plots the sample standard deviation across bootstraps.
+                    # plt.plot(population_FR.std(axis=0, ddof=1), c=Color[tag])
     
                     new_rows = pd.DataFrame({
                         "std": stds, "delay": delay_estimates,

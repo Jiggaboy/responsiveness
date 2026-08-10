@@ -56,7 +56,7 @@ samples_per_strap = 50
 # MAIN METHOD
 #===============================================================================
 def main():
-    control, params = load_config(no_stim=True)
+    control, params = load_config(is_network=False, no_stim=True)
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
     tmp_filename = base_filename + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
     
@@ -91,7 +91,6 @@ def main():
     means = [240., 280., 320.]
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for tag in (mean_tag, std_tag, mean_std_tag):
-        # for tag in (std_tag, ):
             for m, mean in enumerate(means):
                 logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                 rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
@@ -129,12 +128,13 @@ def main():
     
     for m, mean in enumerate(means):
         ax = fig.add_subplot(gs[1, m])
+        title = "Activity over Time\n" + r"$\mu_{pre}$" + f"={int(mean)}mA"
         if m == 0:
-            ax.set(title=r"$\mu_{pre}$" + f"={int(mean)}mA", **ax_kwargs)
+            ax.set(title=title, **ax_kwargs)
         else:
             ax_kwargs_tmp = dict(ax_kwargs)
             ax_kwargs_tmp.pop("ylabel", None)
-            ax.set(title=r"$\mu_{pre}$" + f"={int(mean)}mA", **ax_kwargs_tmp)
+            ax.set(title=title, **ax_kwargs_tmp)
             ax.tick_params(labelleft=False)
 
         
@@ -197,7 +197,7 @@ def main():
     df_rates = pd.concat(all_rates)
     
     ax = fig.add_subplot(gs[2, 0])
-    ax.set(title="Ind. Traces\n", **ax_kwargs)
+    ax.set(title="Ind. Traces", **ax_kwargs)
     plot_FRs(mean, df_rates, t_bins, ax, add_traces=True)
     
     # bin_center = (t_bins[:-1] + t_bins[1:]) / 2
@@ -266,22 +266,31 @@ def main():
     #===============================================================================
     # PLOT -  TIME TO FIRST SPIKE
     #===============================================================================
-    ax = fig.add_subplot(gs[2, 1])
-    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", 
-           title=f"Time to First Spike\nDistribution",
-           ylim=ylim_timetospike)
-
     plot_means = [240, 280, 320]
+    
+    ax = fig.add_subplot(gs[2, 1])
+    
+    ax.set(
+        xlabel=xlabel_drive, 
+        ylabel=ylabel_reaction,
+        title=f"Reaction Time",
+        ylim=ylim_timetospike
+    )
+
     df_tmp = df[df.index.isin(plot_means, level="mean")] - (params.warmup + params.duration_pre)
-    sns.violinplot(df_tmp, x="mean", y="firstspike", hue="tag", 
-                       cut=0, density_norm="width", common_norm=True, 
-                       inner=None,
-                       hue_order=hue_order, 
-                       ax=ax,
-                       native_scale=True,
-            palette=Color,
-            legend=False,
-            )
+    sns.violinplot(
+        df_tmp, 
+        x="mean", 
+        y="firstspike", 
+        hue="tag", 
+        cut=0, density_norm="width", common_norm=True, 
+        inner=None,
+        hue_order=hue_order, 
+        ax=ax,
+        native_scale=True,
+        palette=Color,
+        legend=False,
+    )
     
     
     # handles = []
@@ -291,7 +300,13 @@ def main():
         
     
     ax = fig.add_subplot(gs[2, 2])
-    ax.set(xlabel=r"Mean drive $\mu_{pre}$", ylabel="Time to first spike [ms]", ylim=(25, 87), xticks=(means[::4]), title="Time to First Spike\n")
+    ax.set(
+        xlabel=xlabel_drive, 
+        ylabel=ylabel_reaction,
+        ylim=(25, 87), 
+        xticks=(means[::4]), 
+        title="Reaction Time"
+    )
         
     sns.lineplot(
         data=df - (params.warmup + params.duration_pre),
@@ -356,9 +371,9 @@ def panel_schematic(ax:object):
     damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * 2 * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay, 2)
     # damped_osc[-t_post.size:] = np.sin(2*np.pi * f * t_decay) * exp_decay(t_decay, 6) + 1 - exp_decay(t_decay)
     
-    ax.plot(t, undershoot + offset, color=KTH_sky, label="Undershoot", zorder=10) 
-    ax.plot(t, overshoot + offset, color=KTH_blue, label="Overshoot", zorder=20, alpha=0.7) 
-    ax.plot(t, damped_osc + offset, color=KTH_navy, label="Damped osc.", zorder=15)
+    ax.plot(t, undershoot + offset, color=CUNDERSHOOT, label="Undershoot", zorder=10) 
+    ax.plot(t, overshoot + offset, color=COVERSHOOT, label="Overshoot", zorder=20) 
+    ax.plot(t, damped_osc + offset, color=COSCILLATORY, label="Damped osc.", zorder=15)
     ax.axvline(t_split, c=KTH_grey, ls="--")
     
 def exp_decay(t:np.ndarray, tau:float=1):

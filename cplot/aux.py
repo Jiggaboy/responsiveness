@@ -19,7 +19,8 @@ import numpy as np
 import pandas as pd
 
 
-from constants import Label, Color, KTH_grey
+from constants import Label, Color
+from cplot.constants import KTH_grey
     
 #===============================================================================
 # METHODS
@@ -139,4 +140,29 @@ def add_toplabel(ax:object, x:float, label:str):
         transform=ax.get_xaxis_transform(),
         ha="center",
         va="baseline"
+    )
+    
+
+# From ChatGPT
+def align_zero(ax_ref, ax_other):
+    """Align y=0 of ax_other with y=0 of ax_ref."""
+    ref_min, ref_max = ax_ref.get_ylim()
+
+    if not ref_min < 0 < ref_max:
+        raise ValueError("The reference axis must contain zero.")
+
+    # Relative position of zero, measured from the bottom
+    zero_position = -ref_min / (ref_max - ref_min)
+
+    other_min, other_max = ax_other.get_ylim()
+
+    # Find a span that retains all current values
+    required_span = max(
+        -other_min / zero_position if other_min < 0 else 0,
+        other_max / (1 - zero_position) if other_max > 0 else 0,
+    )
+
+    ax_other.set_ylim(
+        -zero_position * required_span,
+        (1 - zero_position) * required_span,
     )
