@@ -32,17 +32,18 @@ import seaborn as sns
 
 
 from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
-from config import load_config
+from config import load_config, NetworkParams
 import lib.nest_interface as nif
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 
 from lib import siegert
+from lib.rnn import RNN
 from lib.util import pairwise, save_figure, functimer
 from lib.analysis import get_transient, bootstrap
 
 from lib.conversion import spikecount_to_FR
 
-from cplot.aux import plot_axvline_at_change
+from cplot.aux import plot_axvline_at_change, plot_FRs
 
 
 #===============================================================================
@@ -56,7 +57,7 @@ plot_entropy_over_delay = True
 plot_entropy_over_delay = False
 
 plot_transient_estimates = True
-# plot_transient_estimates = False
+plot_transient_estimates = False
 
 plot_time_to_first_spike = True
 plot_time_to_first_spike = False
@@ -78,141 +79,212 @@ samples_per_strap =  50
 pre_FR = 5.
 post_FR = 10.
 
-# Equivalent for network with J = 0.075
-pre_FR = 5.
-post_FR = 10.
-means = np.asarray([-2.5, 35])
 
-pre_mean  = -2.5
-post_mean =  35
+# Set to the same values as in network_simulate.py
+Imean_ext   = 260.
+FR_I = pre_FR
 
-# Equivalent for network with J = 0.25
-# mean = 220
-pre_mean  = 132.5
-post_mean = 181
-# mean = 260
-pre_mean  = 132.5
-post_mean = 214
-# mean = 300
+means = [260., 300.,]
+means = np.arange(220, 320+1, 40.)
+
+tags = (mean_tag, std_tag, mean_std_tag)
+tags = (mean_tag, std_tag, mean_std_tag)
+
+# # Equivalent for network with J = 0.075
+# pre_FR = 5.
+# post_FR = 10.
+# means = np.asarray([-2.5, 35])
+#
+# pre_mean  = -2.5
+# post_mean =  35
+#
+# # Equivalent for network with J = 0.25
+# # mean = 220
 # pre_mean  = 132.5
-# post_mean = 246
-
-# Equivalent for network with J = 0.25
-# mean = 220
-exp220 = {
-    mean_tag: (132.5, 145),
-    std_tag: (132.5, 181),
-    mean_std_tag: (132.5, 164),
-}
-# mean = 260
-exp260 = {
-    mean_tag: (172.5, 185),
-    std_tag: (172.5, 214),
-    mean_std_tag: (172.5, 199),
-}
-# mean = 300
-exp300 = {
-    mean_tag: (212.5, 225),
-    std_tag: (212.5, 246),
-    mean_std_tag: (212.5, 236),
-}
-
-
-exps = [exp220, exp260, exp300]
+# post_mean = 181
+# # mean = 260
+# pre_mean  = 132.5
+# post_mean = 214
+# # mean = 300
+# # pre_mean  = 132.5
+# # post_mean = 246
+#
+# # Equivalent for network with J = 0.25
+# # mean = 220
+# exp220 = {
+#     mean_tag: (132.5, 145),
+#     std_tag: (132.5, 181),
+#     mean_std_tag: (132.5, 164),
+# }
+# # mean = 260
+# exp260 = {
+#     mean_tag: (172.5, 185),
+#     std_tag: (172.5, 214),
+#     mean_std_tag: (172.5, 199),
+# }
+# # mean = 300
+# exp300 = {
+#     mean_tag: (212.5, 225),
+#     std_tag: (212.5, 246),
+#     mean_std_tag: (212.5, 236),
+# }
+#
+#
+# exps = [exp220, exp260, exp300]
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
 
 @functimer 
 def main():
-    control, params = load_config()
-
+    control, params = load_config(no_stim=True)
+    networkparams = NetworkParams(control)
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
+    # tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+    tmp_filename = base_filename + f"_control_{networkparams.J}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+
+    rnn = RNN(networkparams, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
     
-    all_metrics = []
-    all_rates = []
-    all_runs_delays = []   
-    for exp in exps:
-        for tag, (pre_mean, post_mean) in exp.items():
-            tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
-        
-            with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
-                    
-                ##### ALL ANALYSES ######################################
-                rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=pre_mean, post_mean=post_mean)
+    recoveries = []
+    rates = []
+    
+
+    with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
+        for delta in tags:
+            for mean in means:
+                rnn.set_up_network(mean, delta)
+                pre_mean, pre_std = rnn.pre_Esetpoint
+                post_mean, post_std = rnn.post_Esetpoint
+            
+                rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, 
+                                         pre_mean=pre_mean, post_mean=post_mean)
                 run_ids = get_run_ids(rows, params, tag=None)
-                t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
-                
+                t_bins, recovery_samples, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
                 
                 new_rows = pd.DataFrame({
-                    delay_tag: delay_estimates,
+                    delay_tag: recovery_samples,
                 })
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [pre_mean], range(len(delay_estimates))],
+                    [[delta], [pre_mean], range(len(recovery_samples))],
                     names=["tag", "mean", "bootstrap_id"]
                 )
-                all_metrics.append(new_rows)
+                recoveries.append(new_rows)
                 
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[tag], [pre_mean], range(population_FR.shape[0])],
+                    [[delta], [pre_mean], range(population_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
                 )
-                all_rates.append(new_rows)
+                rates.append(new_rows)
+                
+    df_recovery = pd.concat(recoveries)
+    df_rates = pd.concat(rates)
     
     
-    df_rates = pd.concat(all_rates)
-    df_metrics = pd.concat(all_metrics)
-    
+    # all_metrics = []
+    # all_rates = []
+    # all_runs_delays = []   
+    # for exp in exps:
+    #     for tag, (pre_mean, post_mean) in exp.items():
+    #         tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+    #
+    #         with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
+    #
+    #             ##### ALL ANALYSES ######################################
+    #             rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=pre_mean, post_mean=post_mean)
+    #             run_ids = get_run_ids(rows, params, tag=None)
+    #             t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap)
+    #
+    #
+    #             new_rows = pd.DataFrame({
+    #                 delay_tag: delay_estimates,
+    #             })
+    #             new_rows.index = pd.MultiIndex.from_product(
+    #                 [[tag], [pre_mean], range(len(delay_estimates))],
+    #                 names=["tag", "mean", "bootstrap_id"]
+    #             )
+    #             all_metrics.append(new_rows)
+    #
+    #             # Extend the array of firing rates
+    #             new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
+    #             new_rows.index = pd.MultiIndex.from_product(
+    #                 [[tag], [pre_mean], range(population_FR.shape[0])],
+    #                 names=["tag", "mean", "bootstrap_id"]
+    #             )
+    #             all_rates.append(new_rows)
+    #
+    #
+    # df_rates = pd.concat(all_rates)
+    # df_metrics = pd.concat(all_metrics)
+    #
+
     
     
     #===============================================================================
     # PLOT - FIRING RATE AND INDIVIDUAL DELAY ESTIMATES
     #=============================================================================== 
     if plot_rate_and_delays:
-        for exp in exps:
-            pre_mean = exp[mean_tag][0] # Could be any tag
-            t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
-            figname = f"Firing rates (mean: {pre_mean}; pre_FR: {pre_FR}; post_FR: {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
-            fig, ax1 = plt.subplots(num=figname)
-            ax1.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
+        for mean, gb in df_rates.groupby(level=("mean")):
+            figname = f"Activity (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
+            fig, ax = plt.subplots(num=figname)
+            ax.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
                     xlim=(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125))
     
-            plot_axvline_at_change(params, control, ax1)              
+            plot_axvline_at_change(params, control, ax)
+            
+            plot_FRs(mean, df_rates, t_bins, ax)
         
-            ax2 = ax1.twinx()   
-            ax2.set(ylabel="Density of delays", yticks=np.linspace(0, 0.5, 3), ylim=(0, 0.5))
-    
-            bin_center = (t_bins[:-1] + t_bins[1:]) / 2
-        
-            df = df_rates.xs(pre_mean, level=("mean"))
-            for tag, gb in df.groupby(level="tag"):
-                label = Label[tag]
-                color = Color[tag]
+            # bin_center = (t_bins[:-1] + t_bins[1:]) / 2
+            #
+            # for tag, gb_tmp in gb.groupby(level="tag"):
+            #     label = Label[tag]
+            #     color = Color[tag]
                 
-    
-                # g: rows = sims, cols = points
-                mu = gb.mean(axis=0)
-                std = gb.std(axis=0)
+            
         
-    
-                ax1.plot(bin_center, mu, label=label, color=color)
-                ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=5)
-                # break
-                halved = mu.size // 2
-                ax1.axhline(mu[halved:].mean())
-        
-                # Hist delays
-                delays = df_metrics.xs((tag, pre_mean), level=("tag", "mean"))["delay"]
-                ax2.hist(delays + t_start, bins=t_bins, density=True, zorder=-4, rwidth=0.9, alpha=0.5, color=color)
-        
-        
-        
-            ax1.set_ylim(bottom=0) 
-            ax1.legend()
-    
-        # save_figure(figname, fig)
+        # for exp in exps:
+        #     pre_mean = exp[mean_tag][0] # Could be any tag
+        #     t_start = params.warmup + params.duration_pre + (params.stim_reps * params.stim_duration + (params.stim_reps-1) * params.break_duration)
+        #     figname = f"Firing rates (mean: {pre_mean}; pre_FR: {pre_FR}; post_FR: {post_FR}; stim: {params.stim_reps} with {params.stim_duration}ms and break {params.break_duration}ms)"
+        #     fig, ax1 = plt.subplots(num=figname)
+        #     ax1.set(xlabel="Time [ms]", ylabel="Firing rate [Hz]",
+        #             xlim=(params.warmup + params.duration_pre - 10, params.warmup + params.duration_pre + 125))
+        #
+        #     plot_axvline_at_change(params, control, ax1)              
+        #
+        #     ax2 = ax1.twinx()   
+        #     ax2.set(ylabel="Density of delays", yticks=np.linspace(0, 0.5, 3), ylim=(0, 0.5))
+        #
+        #     bin_center = (t_bins[:-1] + t_bins[1:]) / 2
+        #
+        #     df = df_rates.xs(pre_mean, level=("mean"))
+        #     for tag, gb in df.groupby(level="tag"):
+        #         label = Label[tag]
+        #         color = Color[tag]
+        #
+        #
+        #         # g: rows = sims, cols = points
+        #         mu = gb.mean(axis=0)
+        #         std = gb.std(axis=0)
+        #
+        #
+        #         ax1.plot(bin_center, mu, label=label, color=color)
+        #         ax1.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=5)
+        #         # break
+        #         halved = mu.size // 2
+        #         ax1.axhline(mu[halved:].mean())
+        #
+        #         # Hist delays
+        #         delays = df_metrics.xs((tag, pre_mean), level=("tag", "mean"))["delay"]
+        #         ax2.hist(delays + t_start, bins=t_bins, density=True, zorder=-4, rwidth=0.9, alpha=0.5, color=color)
+        #
+        #
+        #
+        #     ax1.set_ylim(bottom=0) 
+        #     ax1.legend()
+        #
+        # # save_figure(figname, fig)
 
     
     #===============================================================================

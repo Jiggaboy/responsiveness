@@ -136,7 +136,7 @@ def bootstrap(hfile:object, run_ids:np.ndarray, params:object, rep:int, samples_
         samples = np.random.choice(run_ids, samples_per_strap, replace=True)
         
         # SPIKECOUNTS 
-        spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=subgroup)[:-2] # offsetting the last bin to avoid boundary effects.
+        spikecounts_all_runs = load_and_merge_spikes(hfile, samples, t_bins, subgroup=subgroup)[:-1] # offsetting the last bin to avoid boundary effects.
         
         # DELAY ESTIMATION
         SEM, delay = get_transient(spikecounts_all_runs.mean(axis=0)[index:])
@@ -231,13 +231,33 @@ def get_tbins(params:object) -> np.ndarray:
     
     :param params: Config-object that contains durations, and hist_binwidth as attributes.
     :type params: object
+    
+    Test:
+    
+    plt.figure()
+    for stim_rep in stim_reps:
+        for stim_duration in stim_durations:
+            params.stim_duration = stim_duration
+            params.stim_reps = stim_rep
+            tbins = get_tbins(params)
+            tstart = get_tstart(params)
+            plt.step(np.arange(len(tbins)), tbins)
+            plt.axhline(tstart)
+    plt.show()
+    quit()
     """
-    t_pre  = np.arange(0., -params.duration_pre, -params.hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
-    t_post = np.arange(0.,  params.duration_post, params.hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2
-    t_bins = np.concat((t_pre, t_post))
+    t_reference = get_tstart(params)
+    t_remaining = params.duration_post + params.duration_pre + params.warmup - t_reference
+    t_pre  = np.arange(0., -t_reference, -params.hist_binwidth, dtype=float)[::-1][:-1]
+    t_post = np.arange(0.,  t_remaining - params.hist_binwidth / 2, params.hist_binwidth, dtype=float)
+    # print(t_pre.shape)
+    # print(t_post.shape)
+    # t_pre  = np.arange(0., -params.duration_pre, -params.hist_binwidth, dtype=float)[::-1][:-1] + params.warmup + params.duration_pre - params.dt / 2
+    # t_post = np.arange(0.,  params.duration_post, params.hist_binwidth, dtype=float) + params.warmup + params.duration_pre - params.dt / 2
+    t_bins = np.concat((t_pre, t_post)) + t_reference - params.dt / 2
     
     assert not np.any(t_bins >= params.warmup + params.duration_pre + params.duration_post)
-    assert np.count_nonzero(t_bins == params.warmup + params.duration_pre - params.dt / 2) == 1
+    assert np.count_nonzero(t_bins == t_reference - params.dt / 2) == 1
     
     return t_bins
 

@@ -32,9 +32,9 @@ from lib.nest_interface import Generator
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, exc_tag, inh_tag
 
 from lib import siegert
-from lib.util import pairwise, save_figure, functimer, h5path
 from lib.analysis import get_transient
 from lib.conversion import from_free_Vm_to_generator, from_generator_to_free_Vm
+from lib.util import pairwise, save_figure, functimer, h5path
 from constants import mean_tag, std_tag, mean_std_tag
 
 
@@ -49,6 +49,8 @@ Imean_ext   = 260.
 means = [260., ]
 means = [260., 300.,]
 means = np.arange(220, 320+1, 40.)
+
+tags = (mean_tag, std_tag, mean_std_tag)
 
 pre_FR = 2 # for E and I
 post_FR = 4
@@ -83,7 +85,7 @@ def main():
         post_Imeans = np.zeros(len(means))
         pre_Istds = np.zeros(len(means))
         post_Istds = np.zeros(len(means))
-        for delta in (mean_tag, std_tag, mean_std_tag):
+        for delta in tags:
             for m, mean in enumerate(means):
                 ### EXCITATION
                 ## PRE

@@ -17,7 +17,6 @@ __version__ = '0.2'
 # IMPORT STATEMENTS
 #===============================================================================
 from cflogger import logger
-logger.setLevel("WARNING")
 
 import nest
 nest.set_verbosity("M_WARNING")
@@ -75,7 +74,7 @@ means = np.arange(220, 320+1, 40.)
 # means = np.arange(260, 320+1, 120.)
 # means = np.arange(240, 290+1, 10.)
 # means = np.append(means, 320.
-seeds = np.arange(200, dtype=int) #40
+
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================

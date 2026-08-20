@@ -101,6 +101,8 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
     plot_kwargs["zorder"] = plot_kwargs.get("zorder", 10)
     plot_kwargs["ymax"] = plot_kwargs.get("ymax", 0.89)
     
+    ytext = plot_kwargs["ymax"] + 0.03
+    
     t_onset = params.warmup + params.duration_pre
     
     label_start = r"$t_\Delta$"
@@ -118,11 +120,11 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
             plot_kwargs_tmp["color"] = "salmon"
             ax.axvline(xend, **plot_kwargs_tmp)
             if i == 0:
-                add_toplabel(ax, xstart, label_start)
-                add_toplabel(ax, xend, label_end)
+                add_toplabel(ax, xstart, label_start, y=ytext)
+                add_toplabel(ax, xend, label_end, y=ytext)
     else:
         ax.axvline(t_onset, **plot_kwargs)
-        add_toplabel(ax, t_onset, label_start)
+        add_toplabel(ax, t_onset, label_start, y=ytext)
 
 
     # if control.brief_stimulus:
@@ -132,10 +134,10 @@ def plot_axvline_at_change(params:object, control:object, ax:object, **plot_kwar
     #     ax.set_xticks(list(ax.get_xticks()) + [t_onset, ], 
     #                   list(ax.get_xticklabels(minor=False)) + [r"$t_\Delta$", ]) 
         
-def add_toplabel(ax:object, x:float, label:str):
+def add_toplabel(ax:object, x:float, label:str, y=0.92):
     ax.text(
         x,
-        0.92,                     # slightly above axes
+        y,                     # slightly above axes
         label,
         transform=ax.get_xaxis_transform(),
         ha="center",

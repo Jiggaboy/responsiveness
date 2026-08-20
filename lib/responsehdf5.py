@@ -18,7 +18,7 @@ __version__ = '0.2a'
 #===============================================================================
 from cflogger import logger
 
-
+from collections.abc import Iterable
 import datetime
 import tables as tb
 import numpy as np
@@ -360,7 +360,11 @@ def load_and_merge_spikes(hfile:object, run_ids:np.ndarray, t_bins:np.ndarray, s
     :param t_bins: time bins passed on to np.histogram
     :type t_bins: np.ndarray
     """
+
+
     spikecounts_all_runs = []
+    if not isinstance(run_ids, Iterable): 
+        run_ids = (run_ids, )
     for run_id in run_ids:
         target = hfile.get_node(hfile.data, f"run{run_id}")
         if subgroup is not None:
@@ -406,9 +410,13 @@ def get_run_ids(rows:np.ndarray, params:object, tag:str):
     else:
         rows_filtered = rows
         logger.error("No valid tag given...")
-    stim_mask = np.logical_and.reduce((rows_filtered["stim_duration"] == params.stim_duration,
-        rows_filtered["break_duration"] == params.break_duration,
-        rows_filtered["stim_reps"] == params.stim_reps))
+    stim_mask = np.logical_and.reduce(
+        (
+            rows_filtered["stim_duration"] == params.stim_duration,
+            rows_filtered["break_duration"] == params.break_duration,
+            rows_filtered["stim_reps"] == params.stim_reps
+        )
+    )
     rows_filtered = rows_filtered[stim_mask]
     run_ids = rows_filtered[id_tag]
     return run_ids

@@ -74,6 +74,8 @@ rcParams["legend.handletextpad"] = .5
 rcParams["legend.framealpha"] = 1
 rcParams["xtick.major.pad"] = 2
 rcParams["ytick.major.pad"] = 2
+rcParams["lines.linewidth"] = 1
+rcParams["lines.markersize"] = 5
 
 rcParams["figure.titlesize"] = "x-large"
 

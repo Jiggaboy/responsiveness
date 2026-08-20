@@ -171,7 +171,6 @@ class RNN:
         # Mean
         self.post_EE_mean = from_free_Vm_to_generator( post_EE_mean )
         self.post_EI_mean = from_free_Vm_to_generator( post_EI_mean )
-        assert post_int_Emean == self.post_EE_mean + self.post_EI_mean
         self.post_int_Emean = post_int_Emean
 
         

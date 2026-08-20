@@ -47,15 +47,11 @@ force = False
 control, params = load_config(no_stim=True)
 xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 65)
 xlim_extendedtime = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 125)
-ylim_recovery           = (0, 75)
-ylim_recovery_extended  = (0, 90)
+ylim_recovery           = (0, 73)
+ylim_recovery_extended  = (0, 92)
 
 yticks_recovery = np.arange(0, 200, 20)
 ylim_FR = (0, 15)
-
-ylabel_recovery = "Recovery Time [ms]"
-ylabel_fr = "FR [Hz]"
-xlabel_drive = r"Mean drive $\mu_{pre}$"
 
 marker_up   = "." #"$\u2191$"
 marker_down = (4, 1, 0) #"$\u2193$"
@@ -81,12 +77,12 @@ samples_per_strap = 50
 
 means = np.asarray([220., 260., 300.])
 means = np.arange(220, 320+1, 40.)
-# means = np.arange(220, 320+1, 20.)
+means = np.arange(220, 320+1, 20.)
 
 
 plot_mean = 260.
 # plot_mean = 240.
-xticks_mean = means[::]
+xticks_mean = means[::2]
 
 fn_id    = f"_{pre_FR_up}"
 fn_rate  = "stim_dfrate" + fn_id
@@ -198,11 +194,11 @@ def main():
     bwparams.stim_reps = stim_reps[0]
         
     overwrite = False
-    metadata_tmp = dict(metadata)
+    metadata = dict(metadata)
     for key in ("pre_FR_down", "post_FR_down"):
-        metadata_tmp.pop(key, None)
-    metadata_tmp["stim_durations"] = stim_durations
-    metadata_tmp["stim_reps"] = stim_reps
+        metadata.pop(key, None)
+    metadata["stim_durations"] = stim_durations
+    metadata["stim_reps"] = stim_reps
     if not force:
         try:
             df_bwrates = pd.read_pickle(fn_bwrate)
@@ -211,7 +207,7 @@ def main():
             logger.info("File not found. Start analysis...")
             overwrite = True
         else:    
-            for key, value in metadata_tmp.items():
+            for key, value in metadata.items():
                 if isinstance(value, np.ndarray) and len(value) > 1 and \
                     isinstance(df_bwrates.attrs[key], np.ndarray) and len(df_bwrates.attrs[key]) > 1:
                     try:
@@ -236,7 +232,6 @@ def main():
     
     t_bins = get_tbins(params)
     if force or overwrite:
-        
         all_metrics = []
         all_rates = []
         for stim_rep, stim_duration in product(stim_reps, stim_durations):
@@ -252,7 +247,7 @@ def main():
                         logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                         rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                         run_ids = get_run_ids(rows, bwparams, tag)
-                        t_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, bwparams, rep=bootstraps, samples_per_strap=samples_per_strap)
+                        bwt_bins, delay_estimates, population_FR = bootstrap(hfile, run_ids, bwparams, rep=bootstraps, samples_per_strap=samples_per_strap)
                 
                         new_rows = pd.DataFrame({delay_tag: delay_estimates,})
                         new_rows.index = pd.MultiIndex.from_product(
@@ -273,7 +268,7 @@ def main():
         # Conversion and save
         df_bwrates = pd.concat(all_rates)
         df_bwdelays = pd.concat(all_metrics)
-        for key, value in metadata_tmp.items():
+        for key, value in metadata.items():
             if isinstance(value, (list, tuple)):
                 value = np.asarray(value)
             df_bwrates.attrs[key] = value
@@ -329,7 +324,7 @@ def main():
         
         ax.set_xlim(ax_kwargs["xlim"])
         if idx == 0:
-            ax.legend(reverse=True, loc='lower right')
+            ax.legend(reverse=True, loc='lower right', ncols=3, bbox_to_anchor=(0, 0, 1.1, 0.5))
    
 
     ax = fig.add_subplot(gs[:1, 2])
@@ -365,7 +360,7 @@ def main():
         for tag in hue_order:
             labels.append(rf"Mean ({stat})")
     handles, _ = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, ncols=2, loc='upper left')
+    ax.legend(handles, labels, ncols=2, loc='upper left', bbox_to_anchor=(-0.02, 1, 1, 0.2))
     
     #===============================================================================
     # PLOTS - TRANSIENTS
@@ -384,8 +379,10 @@ def main():
     
     bwparams.stim_duration = stim_duration
     for s, stim_rep in enumerate(stim_reps):
+        stim_duration = np.round(nif.tau)
         bwparams.stim_reps = stim_rep
         t_start = get_tstart(bwparams)
+        bwt_bins= get_tbins(bwparams)
         
         df_rates_tmp  = df_bwrates.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
         df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
@@ -405,14 +402,14 @@ def main():
             ax.tick_params(labelbottom=False)
                 
         plot_axvline_at_change(bwparams, bwcontrol, ax)
-        plot_FRs(plot_mean, df_rates_tmp, t_bins, ax)
+        plot_FRs(plot_mean, df_rates_tmp, bwt_bins, ax)
         
         ax.set_xlim(xlim_extendedtime)
         # ax.legend()
         
         # axt = ax.twinx()   
         # axt.set(**axt_kwargs)
-        # hist_delays(plot_mean, df_delays_tmp, t_bins, axt, t_start=t_start)
+        # hist_delays(plot_mean, df_delays_tmp, bwt_bins, axt, t_start=t_start)
    
    
         #===============================================================================
@@ -432,19 +429,16 @@ def main():
         #                hue_order=hue_order, ax=ax_violin, native_scale=True,)
 
 
+        
+        
         #===============================================================================
         # PLOTS - Single Up - MEANS across 
         #===============================================================================
-        # ax = fig.add_subplot(gs[s+1, 1:])
-        
-        # ax = fig.add_subplot(gs_recovery[0, 0])
-        
-
         df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR, stim_rep), level=("pre_FR", "post_FR", "stim_reps"))
         
         ax_response_mean = fig.add_subplot(gs_recovery[s, 0])
-        ax_response_std  = fig.add_subplot(gs_recovery[s, 1])
-        ax_response_both = fig.add_subplot(gs_recovery[s, 2])
+        ax_response_std  = fig.add_subplot(gs_recovery[s, 1], sharey=ax_response_mean)
+        ax_response_both = fig.add_subplot(gs_recovery[s, 2], sharey=ax_response_mean)
         
         title = f"Recovery Time\n({stim_rep} stimulation pulse" + "s" * (stim_rep.item() > 1) + ")" #+ 
         for tag, gb in df_delays_tmp.groupby(level="tag"):
@@ -470,19 +464,15 @@ def main():
             ax.set(ylim=ylim_recovery)
         
             lp = sns.lineplot(
-                # data=df_delays_tmp,
                 data=gb,
                 x="mean",
                 y="delay",
                 style="stim_duration",
-                # hue="tag",
                 markers=True,
                 linestyle=ls,
                 errorbar=None,
                 estimator="mean",
-                # hue_order=hue_order,
                 ax=ax,
-                # palette=Color,
                 color = Color[tag],
             )
             lp.legend_.remove()
@@ -492,12 +482,89 @@ def main():
                 handles, legend_labels = ax.get_legend_handles_labels()
                 for label in legend_labels:
                     labels.append(rf"{int(float(label))}ms")
-                ax.legend(handles, labels, ncols=2, alignment="right")
+                ax.legend(handles, labels, ncols=2, bbox_to_anchor=(-0.03, 1, 1, 0.12), loc="upper left")
+        # continue
+        #===============================================================================
+        # STATISTICAL TESTS 
+        #===============================================================================        
+        ## Nonparametric
+        ## Holm Bonferroni correction
         
+        fontdict = {
+            "y": 50, # height
+            "horizontalalignment": "center",
+            # "fontweight": "bold",
+            "fontfamily": "monospace",
+            "fontsize": "large",
+        }
+        
+        from scipy.stats import friedmanchisquare, kruskal, mannwhitneyu
+        
+        df_statistic = df_bwdelays.xs((pre_FR, post_FR, stim_rep), level=("pre_FR", "post_FR", "stim_reps"))
+        
+        for (mean, tag), gb in df_statistic.groupby(level=("mean", "tag")):
+            print(mean, tag, stim_rep)
+            if tag == std_tag:
+                ax = ax_response_mean
+            elif tag == mean_tag:
+                ax = ax_response_std
+            elif tag == mean_std_tag:
+                ax = ax_response_both
+            else:
+                raise ValueError
+            # Kruskal-Wallis H-test for independent samples.
+            # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kruskal.html?utm_source=chatgpt.com
+            # The Kruskal-Wallis H-test tests the null hypothesis that the population median of all of the groups are equal. 
+            # It is a non-parametric version of ANOVA.
+            H, p = kruskal(
+                *(x["delay"] for _, x in gb.groupby("stim_duration", sort=True))
+            )
+            print("Kruskal-Wallis:", p)
+            # print(p / 54)
+        
+        
+            # Perform the Mann-Whitney U rank test on two independent samples.
+            
+            ps = []
+            for stim_duration in stim_durations:
+                if stim_duration == nif.tau:
+                    continue
+        
+                st = mannwhitneyu(
+                    gb.xs(nif.tau, level="stim_duration", drop_level=False),
+                    gb.xs(stim_duration, level="stim_duration", drop_level=False),
+                    alternative="greater", 
+                )
+                print(f"Significance ({nif.tau} vs {stim_duration}):", st.pvalue)
+                ps.append(st.pvalue)
+                # st = mannwhitneyu(
+                #     gb.xs(nif.tau, level="stim_duration", drop_level=False),
+                #     gb.xs(stim_duration, level="stim_duration", drop_level=False),
+                #     alternative="less", 
+                # )
+                # print("Significance: (lower)", st.pvalue)
+            ps = np.asarray(ps)
+            # 6 means, 3 tags, 3 stim_pulses, 4 durations (test vs 3)
+            factor = 6 * 3 * 3 * 4
+            if np.all(ps < (0.0001 / factor)):
+                print(15*"-")
+                ax.text(mean, s=3*r"$\star\!\!$", **fontdict)
+            elif np.all(ps < (0.001 / factor)):
+                print(10*"*")
+                ax.text(mean,s=2*r"$\star\!\!$", **fontdict)
+            elif np.all(ps < (0.05 / factor)):
+                print(5*"*")
+                ax.text(mean, s=1*r"$\star$", **fontdict)
+            else:
+                pass
+        
+        # return
     save_figure(fname, fig, is_latex=True)
     
     
-    # Supplementary Figure
+    #===============================================================================
+    # SUPPLEMENARY FIGURE - RECOVERY TIME OVER NUMBER OF STIMULI
+    #===============================================================================
     fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(nrows=3, ncols=3)
     fig.subplots_adjust(
@@ -509,7 +576,7 @@ def main():
         hspace=.45,
     )
     df_delays_tmp = df_bwdelays.xs((pre_FR, post_FR), level=("pre_FR", "post_FR"))
-    df_delays_tmp = df_delays_tmp[df_delays_tmp.index.isin(means[::1], level="mean")]
+    df_delays_tmp = df_delays_tmp[df_delays_tmp.index.isin(means[::2], level="mean")]
     
     xlim_stimbuffer = 0.5
     ax_kwargs = {
@@ -520,7 +587,7 @@ def main():
         print(i, tag, mean)
         title = f"Stimulus Modality {Label[tag]}"
         title_details = "\n" + r"$\mu_{pre}$=" + f"{mean:.0f}pA"
-        
+    
         if tag == std_tag:
             ax = fig.add_subplot(gs[0, i%3])
             ax.set_xticks(stim_reps)
@@ -533,12 +600,12 @@ def main():
             ax = fig.add_subplot(gs[2, i%3])
             ax.set_xticks(stim_reps)
             ax.set_xlabel(xlabel_stimulus)
-            
+    
         else:
             raise ValueError
         ax.set(**ax_kwargs)
-        
-
+    
+    
         sns.lineplot(
             data = gb,
             x = "stim_reps",
@@ -550,29 +617,30 @@ def main():
             ax = ax,
             color = Color[tag],
         )
-        
-        
+    
+    
         if (i%3) == 1:
             ax.set(title=title + title_details)
         else:
             ax.set(title=title_details)
-            
-            
+    
+    
         if (i%3) == 0:
             ax.set_ylabel(ylabel_recovery)
-            
+    
             labels = []
             handles, legend_labels = ax.get_legend_handles_labels()
             for label in legend_labels:
                 labels.append(rf"{int(float(label))}ms")
-            ax.legend(handles, labels, ncols=2, alignment="right")
+            ax.legend(handles, labels, ncols=2, loc="upper center")
         else:
             ax.set_ylabel("")
             ax.tick_params(labelleft=False)
             ax.legend_.remove()
-            
-            
+    
+    
     save_figure(fname_stim, fig, is_latex=True)
+    
         
 #===============================================================================
 if __name__ == '__main__':

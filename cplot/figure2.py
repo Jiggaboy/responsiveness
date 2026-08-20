@@ -24,7 +24,6 @@ import sklearn.neighbors as skn
 
 from config import load_config
 from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
-from constants import KTH_sky, KTH_blue, KTH_navy, KTH_grey
 
 from lib.analysis import bootstrap, get_tbins, get_response_kernels, get_response_kernel
 from lib.responsehdf5 import ResponseHdf5, get_run_ids
@@ -364,7 +363,7 @@ def main():
         markersize = 10
         kcolor = {under_tag: CUNDERSHOOT, over_tag: COVERSHOOT, osc_tag: COSCILLATORY}
         # kcolor = {under_tag: KTH_sky, over_tag: KTH_blue, osc_tag: KTH_navy}
-        kmarker = {under_tag: "v", over_tag: "^", osc_tag: "$\sim$"}
+        kmarker = {under_tag: "v", over_tag: "^", osc_tag: r"$\sim$"}
         klabel = {under_tag: "undershoot", over_tag: "overshoot", osc_tag: "damped osc."}
         for post_FR, gb_fr in gb.groupby(level=("post_FR")):
             gb_delay = gb_fr.groupby(level=("mean")).mean()

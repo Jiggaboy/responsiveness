@@ -54,6 +54,7 @@ FR_I = pre_FR
 # post_FR = 12.
 
 J = 0.025
+# J = 0.05
 
 bootstraps        = 100
 samples_per_strap =  10#50
@@ -223,7 +224,6 @@ def main(params:object, control:object):
         xlabel=label_drive_mean, ylabel=label_drive_std,
     )
     ax.set_xticks([172.5, 260.])
-    # ax.set_yticks([172.5, 260.])
     
     rnn = RNN(params, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
     quiver_setpoints(ax, rnn, plot_mean)
@@ -244,7 +244,7 @@ def main(params:object, control:object):
     ax = fig.add_subplot(gs[1, 0])
     title = f"Activity over Time" + "\n" + "\n"
     ax.set(title=title, **ax_kwargs)
-    plot_axvline_at_change(params, control, ax)
+    plot_axvline_at_change(params, control, ax, ymax=0.8)
     ax.set(xlim=xlim_time)
     
     plot_FRs(plot_mean, df_Erates, t_bins, ax, hue_order=hue_order, **plot_kwargs)
@@ -255,7 +255,7 @@ def main(params:object, control:object):
     for l, label in enumerate(labels):
         neural_type = "E" if l < 3 else "I"
         labels_updated.append(rf"{label} ({neural_type})")
-    ax.legend(handles, labels_updated, ncols=2)
+    ax.legend(handles, labels_updated, loc="upper center", ncols=2, )
     
     _, ax_tmp = plt.subplots(num="Network response")
     ax_tmp.set(title=title, **ax_kwargs)

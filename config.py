@@ -46,15 +46,16 @@ class Control:
 @dataclass
 class Params:
     control: object
-    N: int                = 500
-    dt: float             = 0.1
-    warmup: float         = 100.
-    duration_pre: float   = 400.
-    duration_post: float  = 1000.
-    stim_duration: float  = nif.tau * 1.5
+    N: int                  = 500
+    seeds: int              = 200
+    dt: float               = 0.1
+    warmup: float           = 100.
+    duration_pre: float     = 400.
+    duration_post: float    = 1000.
+    stim_duration: float    = nif.tau * 1.5
     # stim_duration: float  = nif.tau / 2
-    break_duration: float = 5.
-    stim_reps: int        = 5
+    break_duration: float   = 5.
+    stim_reps: int          = 5
     
     hist_binwidth = 2.
     
@@ -86,6 +87,7 @@ class Params:
             raise ValueError("Invalid arguments")
             
         if c.test:
+            self.seeds         = 30
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
@@ -103,7 +105,7 @@ class NetworkParams(Params):
     C_IE: int               = 100
     C_II: int               = 100
     
-    J = 0.025
+    J = 0.005
     g = 8
     
     def __post_init__(self):
@@ -121,6 +123,7 @@ class NetworkParams(Params):
     
             
         if self.control.test:
+            self.seeds         = 30
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
