@@ -105,12 +105,13 @@ class NetworkParams(Params):
     C_IE: int               = 100
     C_II: int               = 100
     
-    J = 0.005
+    J = 0.075
     g = 8
     
     def __post_init__(self):
         super().__post_init__()
         self.N = 5000
+        self.seeds = 25
         
         
     @property

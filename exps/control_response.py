@@ -151,6 +151,13 @@ def main():
 
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
         for delta in tags:
+            if delta == mean_tag:
+                modality = std_tag
+            elif delta == std_tag:
+                modality = mean_tag
+            else:
+                modality = mean_std_tag
+                
             for mean in means:
                 rnn.set_up_network(mean, delta)
                 pre_mean, pre_std = rnn.pre_Esetpoint
@@ -165,7 +172,7 @@ def main():
                     delay_tag: recovery_samples,
                 })
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[delta], [pre_mean], range(len(recovery_samples))],
+                    [[modality], [pre_mean], range(len(recovery_samples))],
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 recoveries.append(new_rows)
@@ -173,7 +180,7 @@ def main():
                 # Extend the array of firing rates
                 new_rows = pd.DataFrame(population_FR) # Shape Bootstraps x time
                 new_rows.index = pd.MultiIndex.from_product(
-                    [[delta], [pre_mean], range(population_FR.shape[0])],
+                    [[modality], [pre_mean], range(population_FR.shape[0])],
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 rates.append(new_rows)

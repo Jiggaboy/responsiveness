@@ -48,7 +48,7 @@ pre_FR = 5.
 post_FR = 10.
 
 # Set to the same values as in network_simulate.py
-Imean_ext   = 260.
+Imean_ext = 260.
 FR_I = pre_FR
 
 means = [260., 300.,]
@@ -57,47 +57,6 @@ means = np.arange(220, 320+1, 40.)
 tags = (mean_tag, std_tag, mean_std_tag)
 # tags = (mean_tag, )
 
-# # J = 0.75
-# pre_mean  = -2.5
-# post_mean =  35
-#
-#
-# ### J = 0.25
-# ## delta mean
-# # mean = 220
-# pre_mean  = 132.5
-# post_mean = 181
-# # mean = 260
-# pre_mean  = 172.5
-# post_mean = 214
-# # mean = 300
-# pre_mean  = 212.5
-# post_mean = 246
-#
-# ## delta std
-# # mean = 220
-# pre_mean  = 132.5
-# post_mean = 145
-# # mean = 260
-# pre_mean  = 172.5
-# post_mean = 185
-# # # mean = 300
-# pre_mean  = 212.5
-# post_mean = 225
-#
-# ## delta both
-# # mean = 220
-# pre_mean  = 132.5
-# post_mean = 164
-# # mean = 260
-# pre_mean  = 172.5
-# post_mean = 199
-# # # mean = 300
-# pre_mean  = 212.5
-# post_mean = 236
-
-
-seeds = np.arange(200, dtype=int) #40
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
 #===============================================================================
@@ -106,7 +65,6 @@ def main():
     control, params = load_config(no_stim=True)
     networkparams = NetworkParams(control)
     base_filename, suffix = params.filename.rsplit(".", maxsplit=1)
-    # tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
     tmp_filename = base_filename + f"_control_{networkparams.J}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
 
     rnn = RNN(networkparams, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
@@ -118,9 +76,6 @@ def main():
                 rnn.set_up_network(mean, delta)
                 pre_mean, pre_std = rnn.pre_Esetpoint
                 post_mean, post_std = rnn.post_Esetpoint
-        #
-        # pre_std  = round(siegert.find_parameter(pre_mean, target_FR=pre_FR, dt=params.dt).root, 2)
-        # post_std = round(siegert.find_parameter(post_mean, target_FR=post_FR, dt=params.dt).root, 2) # ie delta std
                 
                 # Run simulations
                 for seed in np.arange(params.seeds):
