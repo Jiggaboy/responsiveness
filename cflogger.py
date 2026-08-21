@@ -30,7 +30,7 @@ import numpy as np
 # Printing to a file is corrupted if linewidth is an integer.
 np.set_printoptions(linewidth=np.nan)
 
-# constants
+# plot_constants
 LOG_LEVEL = logging.INFO
 LOG_FORMAT = "%(asctime)s - %(funcName)s: %(message)s"
 DEF_LOG_FILE = "./debug.log"

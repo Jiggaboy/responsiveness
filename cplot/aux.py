@@ -20,7 +20,7 @@ import pandas as pd
 
 
 from constants import Label, Color
-from cplot.constants import KTH_grey
+from cplot.plot_constants import KTH_grey
     
 #===============================================================================
 # METHODS

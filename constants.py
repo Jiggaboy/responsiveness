@@ -11,7 +11,7 @@ __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
 __version__ = '0.1b'
 
-from cplot.constants import KTH_brick, KTH_turquoise, KTH_yellow
+from cplot.plot_constants import KTH_brick, KTH_turquoise, KTH_yellow
 
 #===============================================================================
 # TAGS - Indicates the value that is kept constant

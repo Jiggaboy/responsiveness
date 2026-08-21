@@ -23,7 +23,7 @@ import seaborn as sns
 import sklearn.neighbors as skn
 
 from config import load_config
-from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 
 from lib.analysis import bootstrap, get_tbins, get_response_kernels, get_response_kernel
 from lib.responsehdf5 import ResponseHdf5, get_run_ids

@@ -27,7 +27,7 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
+from plot_constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color
 from config import load_config
 import lib.nest_interface as nif
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender

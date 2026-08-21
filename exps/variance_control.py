@@ -31,7 +31,7 @@ import seaborn as sns
 
 
 from config import load_config
-from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids, exc_tag
 
 from lib import siegert

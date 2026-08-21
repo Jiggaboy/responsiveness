@@ -30,7 +30,7 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from constants import mean_tag, std_tag, mean_std_tag
+from plot_constants import mean_tag, std_tag, mean_std_tag
 from config import load_config
 import lib.nest_interface as nif
 from lib.nest_interface import Generator

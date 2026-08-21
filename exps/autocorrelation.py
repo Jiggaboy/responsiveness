@@ -27,7 +27,7 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
+from plot_constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
 from config import load_config
 import lib.nest_interface as nif
 from lib.analysis import bootstrap, get_tbins, get_tstart

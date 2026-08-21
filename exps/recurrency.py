@@ -20,7 +20,7 @@ import numpy as np
 
 import lib.nest_interface as nif
 
-from constants import mean_tag, std_tag, mean_std_tag, Color
+from plot_constants import mean_tag, std_tag, mean_std_tag, Color
 from cplot.constants import EXC_NEURON, INH_NEURON, quiver_style
 from cplot.aux import align_zero
 from lib import siegert

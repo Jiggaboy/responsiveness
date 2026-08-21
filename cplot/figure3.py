@@ -23,7 +23,7 @@ import pandas as pd
 import seaborn as sns
 
 from config import load_config, Control, Params
-from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 
 from lib.analysis import bootstrap, get_tbins, get_tstart
 from lib.conversion import spikecount_to_FR

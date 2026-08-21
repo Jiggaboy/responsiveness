@@ -23,7 +23,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from constants import mean_tag, std_tag, mean_std_tag
+from plot_constants import mean_tag, std_tag, mean_std_tag
 
 import lib.nest_interface as nif
 from lib.nest_interface import Generator
