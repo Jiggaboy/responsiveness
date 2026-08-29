@@ -19,18 +19,19 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as  mpatches
 import numpy as np
 import pandas as pd
+import pathlib
 import seaborn as sns
 import sklearn.neighbors as skn
 
-from config import load_config
-from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from config import load_config, NetworkParams
+from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order, DATA_DIR
 
 from lib.analysis import bootstrap, get_tbins, get_tstart
 from lib.responsehdf5 import ResponseHdf5, get_run_ids, exc_tag, inh_tag
 from lib.rnn import RNN
 from lib.util import save_figure
 
-from cplot.constants import *
+from cplot.plot_constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 #===============================================================================
@@ -40,6 +41,9 @@ figsize = (17.6*cm, 15*cm)
 fname = "figure4_network"
 
 control, params = load_config(is_network=True, no_stim=True)
+
+tags = (mean_tag, std_tag, mean_std_tag)
+# tags = (mean_tag, )
 
 ylim_delay = (0, 85)
 ylim_FR = (0, 15)
@@ -54,7 +58,8 @@ FR_I = pre_FR
 # post_FR = 12.
 
 J = 0.025
-# J = 0.05
+J = 0.005
+J = 0.025
 
 bootstraps        = 100
 samples_per_strap =  10#50
@@ -67,34 +72,11 @@ plot_mean = 260.
 # plot_mean = 220.
 Imean_ext = 260.
 
-### Control FF Network
-# Equivalent for network with J = 0.25
-# mean = 220
-exp220 = {
-    mean_tag: (132.5, 145),
-    std_tag: (132.5, 181),
-    mean_std_tag: (132.5, 164),
-}
-# mean = 260
-exp260 = {
-    mean_tag: (172.5, 185),
-    std_tag: (172.5, 214),
-    mean_std_tag: (172.5, 199),
-}
-# mean = 300
-exp300 = {
-    mean_tag: (212.5, 225),
-    std_tag: (212.5, 246),
-    mean_std_tag: (212.5, 236),
-}
-control_exp = exp260
-exps = [exp220, exp260, exp300]
-
 
 fn_id    = f"_{pre_FR}_J{J}"
-fn_Erate  = "dfnetwork_Erate" + fn_id
-fn_Irate  = "dfnetwork_Irate" + fn_id
-fn_delay = "dfnetwork_delay" + fn_id
+fn_Erate  = pathlib.Path(DATA_DIR) / ("dfnetwork_Erate" + fn_id)
+fn_Irate  = pathlib.Path(DATA_DIR) / ("dfnetwork_Irate" + fn_id)
+fn_delay = pathlib.Path(DATA_DIR) / ("dfnetwork_delay" + fn_id)
     
 #===============================================================================
 # MAIN METHOD
@@ -112,7 +94,7 @@ def main(params:object, control:object):
     
         
     #===============================================================================
-    # DATA COLLECTION
+    # # DATA COLLECTION
     overwrite = False
     if not force:
         try:        
@@ -149,26 +131,25 @@ def main(params:object, control:object):
         delays = []
         Erates = []
         Irates = []
-            
+    
         with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
-            for tag in (mean_tag, std_tag, mean_std_tag):
-            # for tag in (std_tag, ):
+            for tag in tags:
                 for m, mean in enumerate(means):
                     logger.info(f"Run mean {mean} ({m+1} of {len(means)})...")
                     rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=mean)
                     run_ids = get_run_ids(rows, params, tag)
-                    
+    
                     t_bins, Edelay_estimates, Epopulation_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, subgroup=exc_tag)
                     t_bins, Idelay_estimates, Ipopulation_FR = bootstrap(hfile, run_ids, params, rep=bootstraps, samples_per_strap=samples_per_strap, subgroup=inh_tag)
-            
+    
                     new_rows = pd.DataFrame({delay_tag: Edelay_estimates,})
                     new_rows.index = pd.MultiIndex.from_product(
                         [[tag], [mean], range(len(Edelay_estimates))],
                         names=["tag", "mean", "bootstrap_id"]
                     )
                     delays.append(new_rows)
-                    
-                
+    
+    
                     # Extend the array of firing rates
                     new_rows = pd.DataFrame(Epopulation_FR)
                     new_rows.index = pd.MultiIndex.from_product(
@@ -176,7 +157,7 @@ def main(params:object, control:object):
                         names=["tag", "mean", "bootstrap_id"]
                     )
                     Erates.append(new_rows)
-                    
+    
                     # Extend the array of firing rates
                     new_rows = pd.DataFrame(Ipopulation_FR)
                     new_rows.index = pd.MultiIndex.from_product(
@@ -189,7 +170,7 @@ def main(params:object, control:object):
         df_Erates = pd.concat(Erates)
         df_Irates = pd.concat(Irates)
         df_delays = pd.concat(delays)
-        
+    
         dfs = [df_Erates, df_Irates, df_delays]
         fns = [fn_Erate, fn_Irate, fn_delay]
         for df, fn in zip(dfs, fns):
@@ -218,18 +199,23 @@ def main(params:object, control:object):
     
     
     
-    ax = fig.add_subplot(gs[0, 2])
+    # ax = fig.add_subplot(gs[0, 2])
+    ax = fig.add_subplot(gs[:, :])
     ax.set(
         title="Set Points", 
-        xlabel=label_drive_mean, ylabel=label_drive_std,
+        xlabel=xlabel_drive, ylabel=label_drive_std,
     )
-    ax.set_xticks([172.5, 260.])
+    # ax.set_xticks([172.5, 260.])
+    ax.set_ylim((650, 900))
+    ax.set_xlim((240, 280))
     
     rnn = RNN(params, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
     quiver_setpoints(ax, rnn, plot_mean)
-    
+    # return
     #===============================================================================
     ## FIRING RATE
+    t_bins = get_tbins(params)
+    
     ax_kwargs = {
         "xlabel": xlabel_time, 
         "ylabel": ylabel_fr, 
@@ -255,7 +241,7 @@ def main(params:object, control:object):
     for l, label in enumerate(labels):
         neural_type = "E" if l < 3 else "I"
         labels_updated.append(rf"{label} ({neural_type})")
-    ax.legend(handles, labels_updated, loc="upper center", ncols=2, )
+    ax.legend(handles, labels_updated, loc="upper center", ncols=2, bbox_to_anchor=(0, 1, 1, 0.2))
     
     _, ax_tmp = plt.subplots(num="Network response")
     ax_tmp.set(title=title, **ax_kwargs)
@@ -409,7 +395,7 @@ def main(params:object, control:object):
         ylabel = "Neuron ID", 
         xlim = (1155, 1205),
         ylim = (0, 6250),
-        title = f"Raster Plot\n(" + r"$\mu_{pre}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
+        title = f"Raster Plot\n(" + r"$\mu_{\mathrm{pre}}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
     )
     ax_raster.set_xticks([1160, 1180, 1200])
     ax_raster.ticklabel_format(axis="y", style="scientific", scilimits=(0, 2), useMathText=True)
@@ -459,6 +445,8 @@ def main(params:object, control:object):
     ## CONTROL NETWORK
     #===============================================================================
     control, params = load_config(is_network=False, no_stim=True)
+    networkparams = NetworkParams(control)
+    
     cbootstraps = 100
     csamples_per_strap = 50
 
@@ -467,9 +455,21 @@ def main(params:object, control:object):
     all_metrics = []
     all_rates = []
     
-    for exp in exps:
-        for tag, (pre_mean, post_mean) in exp.items():
-            tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+    for tag in tags:
+        if tag == mean_tag:
+            delta = std_tag
+        elif tag == std_tag:
+            delta = mean_tag
+        else:
+            delta = mean_std_tag
+        for mean in means:
+
+            
+            rnn.set_up_network(mean, delta=delta)
+            pre_mean  = rnn.pre_Esetpoint[0]
+            post_mean = rnn.post_Esetpoint[0]
+            # tmp_filename = base_filename + f"_{pre_mean}_{post_mean}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
+            tmp_filename = base_filename + f"_control_{networkparams.J}" + f"_{float(pre_FR)}_{float(post_FR)}" + f".{suffix}"
         
             with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
                     
@@ -494,10 +494,10 @@ def main(params:object, control:object):
                     names=["tag", "mean", "bootstrap_id"]
                 )
                 all_rates.append(new_rows)
-
+    
     df_rates = pd.concat(all_rates)
     df_metrics = pd.concat(all_metrics)
-        
+            
     
     ax_control = fig.add_subplot(gs[2, 0])
     title = "Feedforward Control" + "\n"
@@ -505,7 +505,10 @@ def main(params:object, control:object):
     plot_axvline_at_change(params, control, ax_control)
     ax_control.set(xlim=xlim_time)
                 
-    control_mean = control_exp[mean_tag][0]
+    
+    rnn.set_up_network(plot_mean, delta="mean")
+    control_mean  = rnn.pre_Esetpoint[0]
+    
     plot_FRs(control_mean, df_rates, t_bins, ax_control, **plot_kwargs)
     
     
@@ -525,7 +528,8 @@ def main(params:object, control:object):
     ax_control_recovery = fig.add_subplot(gs[2, 1])
 
     title = f"Recovery Time (Control)" + "\n"
-    xticks = [exp[mean_tag][0] for exp in exps]
+    xticks = df_metrics.index.unique(level="mean")
+    xticks = list(xticks)
     ax_control_recovery.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay, title=title)
 
     sns.violinplot(
@@ -607,37 +611,46 @@ def main(params:object, control:object):
 #===============================================================================
 
 def quiver_setpoints(ax:object, rnn:RNN, mean:float):
-    for delta in (mean_tag, std_tag, mean_std_tag):
+    
+    rnn.set_up_network(mean, delta="mean")
+    # plt.scatter(x, y, s, c, marker, cmap, norm, vmin, vmax, alpha, linewidths)
+    # Start: FF
+    ax.scatter(rnn.pre_drive_Emean, rnn.pre_drive_Estd, c=KTH_grey, zorder = 10,
+        s = 5,)
+    
+    # EE contribution
+    # Example:
+    # pre_drive_Estd = 1310; pre_EE_std = 39; pre_EI_std = 319
+    # Rooted sum of squares = 1349
+    # EE contribution
+    EE_quiver = np.sqrt(rnn.pre_drive_Estd**2 + rnn.pre_EE_std**2)
+    ax.quiver(
+        rnn.pre_drive_Emean, rnn.pre_drive_Estd, 
+        rnn.pre_EE_mean, EE_quiver - rnn.pre_drive_Estd,
+        color=EXC_NEURON,
+        zorder = 5,
+        **quiver_style,
+    )
+    # EI contribution
+    ax.quiver(
+        rnn.pre_drive_Emean + rnn.pre_EE_mean, EE_quiver,
+        rnn.pre_EI_mean, rnn.pre_Esetpoint[1] - EE_quiver,
+        color=INH_NEURON,
+        zorder = 4,
+        **quiver_style,
+    )
+
+    # Start: Pre
+    ax.scatter(
+        *rnn.pre_Esetpoint,
+        c = KTH_grey,
+        zorder = 10,
+        s = 5,
+    )
+    
+    for delta in tags:
         rnn.set_up_network(mean, delta=delta)
         
-        # plt.scatter(x, y, s, c, marker, cmap, norm, vmin, vmax, alpha, linewidths)
-        # Start: FF
-        ax.scatter(rnn.pre_drive_Emean, rnn.pre_drive_Estd, c=KTH_grey, zorder = 10,
-            s = 5,)
-        # EE contribution
-        ax.quiver(
-            rnn.pre_drive_Emean, rnn.pre_drive_Estd, 
-            rnn.pre_EE_mean, rnn.pre_EE_std,
-            color=EXC_NEURON,
-            zorder = 5,
-            **quiver_style,
-        )
-        # EI contribution
-        ax.quiver(
-            rnn.pre_drive_Emean + rnn.pre_EE_mean, rnn.pre_drive_Estd + rnn.pre_EE_std,
-            rnn.pre_EI_mean, rnn.pre_EI_std,
-            color=INH_NEURON,
-            zorder = 4,
-            **quiver_style,
-        )
-        
-        # Start: Pre
-        ax.scatter(
-            *rnn.pre_Esetpoint,
-            c = KTH_grey,
-            zorder = 10,
-            s = 5,
-        )
         #####################################################################################
         if delta == mean_tag:
             color = Color[std_tag]
@@ -647,20 +660,24 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
             color = Color[mean_std_tag]
         
         deltaEE_mean = rnn.post_EE_mean - rnn.pre_EE_mean
-        deltaEE_std  = rnn.post_EE_std - rnn.pre_EE_std
+
+        deltadrive_std = np.sqrt(rnn.post_drive_Estd**2 - rnn.pre_drive_Estd**2)
+        deltadrive_std = rnn.post_drive_Estd - rnn.pre_drive_Estd
         
         # Delta Generator
         ax.quiver(
             *rnn.pre_Esetpoint,
-            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0] - deltaEE_mean, rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1] - deltaEE_std,
+            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0] - deltaEE_mean, 
+            deltadrive_std,
             color=KTH_grey,
             zorder = 2,
             **quiver_style,
         )
-        
-    
+
+        deltaEE_std = rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1] - deltadrive_std
         ax.quiver(
-            rnn.post_Esetpoint[0] - deltaEE_mean, rnn.post_Esetpoint[1] - deltaEE_std,
+            rnn.post_Esetpoint[0] - deltaEE_mean, 
+            rnn.post_Esetpoint[1] - deltaEE_std,
             deltaEE_mean, deltaEE_std,
             color=EXC_NEURON,
             zorder = 5,
@@ -669,7 +686,8 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
         
         ax.quiver(
             *rnn.pre_Esetpoint,
-            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0], rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1],
+            rnn.post_Esetpoint[0] - rnn.pre_Esetpoint[0], 
+            rnn.post_Esetpoint[1] - rnn.pre_Esetpoint[1],
             color=color,
             zorder = 4,
             **quiver_style,

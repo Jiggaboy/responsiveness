@@ -23,7 +23,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from plot_constants import mean_tag, std_tag, mean_std_tag
+from constants import mean_tag, std_tag, mean_std_tag
 
 import lib.nest_interface as nif
 from lib.nest_interface import Generator
@@ -44,7 +44,7 @@ control, params = load_config(is_network=True)
 
 Imean_ext   = 260.
 means = [260., ]
-means = [260., 300.,]
+# means = [260., 300.,]
 means = np.arange(220, 320+1, 40.)
 
 tags = (mean_tag, std_tag, mean_std_tag)
@@ -54,7 +54,6 @@ pre_FR  = 5
 post_FR = 10
 FR_I    = pre_FR
 
-seeds = np.arange(25, dtype=int)
 #===============================================================================
 # MAIN METHOD
 #===============================================================================
@@ -176,7 +175,7 @@ def simulate(params:object, control:object,
 
     logger.info("Create Network...")
     Eneurons = nif.create_LIF(params.N)
-    Ineurons = nif.create_LIF(params.N // 4)
+    Ineurons = nif.create_LIF(params.N // params.gamma)
     
     logger.info("Connect Network...")
     # Connect(pre, post, conn_spec=None, syn_spec=None, return_synapsecollection=False)¶

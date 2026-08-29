@@ -41,11 +41,11 @@ COSCILLATORY    = "cornflowerblue"
 
 
 ############ LABELS #########################
-label_drive_std    = r"Fluctuation level $\sigma$ [pA]"
+label_drive_std    = r"Fluctuation level $\sigma_{\mathrm{pre}}$ [pA]"
 label_drive_mean   = r"Mean drive $\mu$ [pA]"
 
 xlabel_time     = "Time [ms]"
-xlabel_drive    = r"Mean drive $\mu_{pre}$ [pA]"
+xlabel_drive    = r"Mean drive $\mu_{\mathrm{pre}}$ [pA]"
 xlabel_stimulus = "# of stimulus pulses"
 
 ylabel_fr       = "FR [Hz]"

@@ -85,11 +85,11 @@ post_FR = 10.
 Imean_ext = 260.
 FR_I = pre_FR
 
-means = [260., 300.,]
+means = [260., ]
 means = np.arange(220, 320+1, 40.)
 
 tags = (mean_tag, std_tag, mean_std_tag)
-tags = (mean_tag, )
+# tags = (mean_tag, )
 
 #===============================================================================
 # MAIN METHOD AND TESTING AREA
@@ -155,7 +155,7 @@ def main():
     #=============================================================================== 
     if plot_rate_and_delays:
         for mean, gb in df_rates.groupby(level=("mean")):
-            figname = f"Activity (mean: {mean}; pre_FR: {pre_FR}; post_FR: {post_FR})"
+            figname = f"Activity (mean: {mean:.2f}; J: {networkparams.J})"
             fig, ax = plt.subplots(num=figname)
             ax.set(
                 xlabel=xlabel_time, ylabel=ylabel_fr,

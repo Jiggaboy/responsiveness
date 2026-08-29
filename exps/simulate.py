@@ -30,7 +30,7 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from plot_constants import mean_tag, std_tag, mean_std_tag
+from constants import mean_tag, std_tag, mean_std_tag
 from config import load_config
 import lib.nest_interface as nif
 from lib.nest_interface import Generator
@@ -58,8 +58,8 @@ post_FR = 5.
 pre_FR = 5.
 post_FR = 10.
 #
-pre_FR = 10.
-post_FR = 5.
+# pre_FR = 10.
+# post_FR = 5.
 # # #
 # pre_FR = 4.
 # post_FR = 6.
@@ -116,7 +116,7 @@ def main():
             # Run simulations
             for pre_mean, post_mean, pre_std, post_std in zip(pre_means, post_means, pre_stds, post_stds):
                 logger.warning(f"Tag: {delta}; Mean: {pre_mean}")
-                for seed in seeds:
+                for seed in np.arange(params.seeds):
                     # TODO: Add condition here for stimulus, break, and duration.
                     if not control.force and len(hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR,
                                                            pre_mean=pre_mean, post_mean=post_mean,

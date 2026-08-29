@@ -31,7 +31,7 @@ import pandas as pd
 from scipy.stats import entropy
 import seaborn as sns
 
-from plot_constants import mean_tag, std_tag, mean_std_tag
+from constants import mean_tag, std_tag, mean_std_tag
 from config import load_config, NetworkParams
 import lib.nest_interface as nif
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender
@@ -51,7 +51,7 @@ post_FR = 10.
 Imean_ext = 260.
 FR_I = pre_FR
 
-means = [260., 300.,]
+means = [260., ]
 means = np.arange(220, 320+1, 40.)
 
 tags = (mean_tag, std_tag, mean_std_tag)

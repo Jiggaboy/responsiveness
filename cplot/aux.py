@@ -46,10 +46,6 @@ def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, ad
         # Filter a potential "all" id:
         gb = g[g.index.get_level_values("bootstrap_id") != "all"]
 
-        # Delay Estimation across all runs
-        # d = df_all_runs_delays.xs((tag, mean), level=("tag", "mean"))[delay_tag].squeeze()
-        # ax1.axvline(d + t_start, c=color, lw=2, ls="--", zorder=15)
-
         # g: rows = sims, cols = points
         mu = gb.mean(axis=0)
         std = gb.std(axis=0)
@@ -60,8 +56,6 @@ def plot_FRs(mean:float, df_rates:pd.DataFrame, t_bins:np.ndarray, ax:object, ad
         ax.plot(bin_center, mu, label=label, color=color, **plot_kwargs)
         ax.fill_between(bin_center, mu+std, mu-std, color=color, alpha=0.25, zorder=-5)
         
-        halved = mu.size // 2
-        # ax.axhline(mu[halved:].mean(), color=color, **plot_kwargs)
         
     
 def hist_delays(mean:float, df_delays:pd.DataFrame, t_bins:np.ndarray, ax:object, t_start:float=0.):

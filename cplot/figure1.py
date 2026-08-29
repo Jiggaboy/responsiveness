@@ -126,7 +126,7 @@ def main():
     
     for m, mean in enumerate(means):
         ax = fig.add_subplot(gs[1, m])
-        title = "Activity over Time\n" + r"$\mu_{pre}$" + f"={int(mean)}mA"
+        title = "Activity over Time\n" + r"$\mu_{pre}$" + f"={int(mean)}pA"
         if m == 0:
             ax.set(title=title, **ax_kwargs)
         else:

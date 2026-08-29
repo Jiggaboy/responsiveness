@@ -84,6 +84,7 @@ class ResponseHdf5(tb.File):
                     self.remove_node(child, recursive=True)
                 self.set_metadata(metadata)
             else:
+                self.close()
                 raise FileExistsError
         
         self.data = self.require_group(self.root, data_tag)

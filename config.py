@@ -100,18 +100,25 @@ class Params:
 class NetworkParams(Params):    
     # Target-Source notation
     # Indegree definition
-    C_EE: int               = 400
-    C_EI: int               = 400
-    C_IE: int               = 100
-    C_II: int               = 100
+    # Fixed indegree
+    C_EE: int               = 500
+    C_EI: int               = 125
+    C_IE: int               = 500
+    # C_EI: int               = 500
+    # C_IE: int               = 125
+    C_II: int               = 125
     
-    J = 0.075
+    # J = 0.005
+    J = 0.0125
     g = 8
+    gamma = 4 # The ratio of excitatory to inhibitory neurons
     
     def __post_init__(self):
         super().__post_init__()
         self.N = 5000
-        self.seeds = 25
+        self.seeds = 30
+        # self.N = 20000 # less correlations
+        # self.seeds = 10
         
         
     @property
@@ -124,7 +131,7 @@ class NetworkParams(Params):
     
             
         if self.control.test:
-            self.seeds         = 30
+            self.seeds         = 3
             self.N             = 500  
             self.duration_pre  = 200.
             self.duration_post = 500.
@@ -140,6 +147,7 @@ class NetworkParams(Params):
         conn = {k: getattr(self, k) for k in conn_keys}
         base.update(conn)
         return base
+    
 #===============================================================================
 # METHODS
 #===============================================================================

@@ -48,7 +48,7 @@ class RNN:
     def pre_Esetpoint(self):
         return (
             self.pre_drive_Emean + self.pre_EE_mean + self.pre_EI_mean,
-            self.pre_drive_Estd + self.pre_EE_std + self.pre_EI_std
+            np.sqrt(self.pre_drive_Estd**2 + self.pre_EE_std**2 + self.pre_EI_std**2)
         )
         
     
@@ -56,7 +56,7 @@ class RNN:
     def post_Esetpoint(self):
         return (
             self.post_drive_Emean + self.post_EE_mean + self.post_EI_mean,
-            self.post_drive_Estd + self.post_EE_std + self.post_EI_std
+            np.sqrt(self.post_drive_Estd**2 + self.post_EE_std**2 + self.post_EI_std**2)
         )
         
      
@@ -84,18 +84,23 @@ class RNN:
 
         if delta == mean_tag:
             # Delta mean (Factor sqrt(2) required, cf Tsodyks 1991)
+            # Add the external and internal fluctuation level (variances),
+            # and find the total mean drive to the E population.
             post_total_Emean = siegert.find_parameter(np.sqrt(pre_drive_Estd**2 + post_int_Evar), target_FR=self.post_FR, given_parameter="std", dt=params.dt).root # Estd_tmp in Generator space
 
+            # Compensate the total drive by the internal drive
             post_drive_Emean = post_total_Emean - post_int_Emean
             post_drive_Estd  = pre_drive_Estd
+            assert np.isclose(siegert.FR_from_siegert(post_total_Emean, np.sqrt(pre_drive_Estd**2 + post_int_Evar), dt=params.dt), self.post_FR)
         elif delta == std_tag:
-            # Delta std - keeping the same ext. drive; update with new internal network effects
+            # Delta std - keeping the same ext. drive; 
+            # update with new internal network effects.
             post_total_Estd = siegert.find_parameter(pre_drive_Emean+post_int_Emean, target_FR=self.post_FR, dt=params.dt).root # Estd_tmp in Generator space
             
             post_drive_Emean = pre_drive_Emean
             post_drive_Estd  = np.sqrt(post_total_Estd**2 - post_int_Evar) # Remove updated internal network effects
         elif delta == mean_std_tag:                    
-            # Delta std - keeping the same ext. drive; update with new internal network effects
+            # Delta both - keeping the same ext. drive; update with new internal network effects
             post_total_Estd = siegert.find_parameter(pre_drive_Emean+post_int_Emean, target_FR=self.post_FR, dt=params.dt).root # Estd_tmp in Generator space
             post_drive_Estd_tmp = np.sqrt(post_total_Estd**2 - post_int_Evar) # Remove updated internal network effects
             
@@ -167,13 +172,15 @@ class RNN:
         self.post_drive_Emean = post_drive_Emean
         self.post_drive_Estd  = post_drive_Estd
         
+        self.post_drive_Imean = post_drive_Imean
+        self.post_drive_Istd  = pre_drive_Istd
+        
         # Internal excitatory variables
         # Mean
         self.post_EE_mean = from_free_Vm_to_generator( post_EE_mean )
         self.post_EI_mean = from_free_Vm_to_generator( post_EI_mean )
         self.post_int_Emean = post_int_Emean
 
-        
         # Std
         self.post_EE_std = np.sqrt( from_free_Vm_to_generator( var_V=post_EE_var, dt=params.dt ))
         self.post_EI_std = np.sqrt( from_free_Vm_to_generator( var_V=post_EI_var, dt=params.dt ))
@@ -182,8 +189,10 @@ class RNN:
         
         # Internal inhibitory variables
         # Mean
-        self.pre_drive_Imean = self.drive_Imean
-        self.pre_IE_mean = from_free_Vm_to_generator( pre_IE_mean )
-        self.pre_II_mean = from_free_Vm_to_generator( pre_II_mean )
+        self.post_IE_mean = from_free_Vm_to_generator( post_IE_mean )
+        self.post_II_mean = from_free_Vm_to_generator( post_II_mean )
 
+        # Std
+        self.post_IE_std = np.sqrt( from_free_Vm_to_generator( var_V=post_IE_var, dt=params.dt ))
+        self.post_II_std = np.sqrt( from_free_Vm_to_generator( var_V=post_II_var, dt=params.dt ))
 
