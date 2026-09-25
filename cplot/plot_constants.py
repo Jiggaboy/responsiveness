@@ -28,6 +28,7 @@ KTH_navy        = "#000061"
 KTH_sky         = "#6298D2"
 
 KTH_grey        = "#A5A5A5"
+KTH_darkgrey    = "#323232"
 
 ############ COLORS #########################
 EXC_NEURON = "#78001aff"

@@ -52,7 +52,7 @@ Imean_ext = 260.
 FR_I = pre_FR
 
 means = [260., ]
-means = np.arange(220, 320+1, 40.)
+means = np.arange(220, 320+1, 20.)
 
 tags = (mean_tag, std_tag, mean_std_tag)
 # tags = (mean_tag, )

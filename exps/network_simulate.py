@@ -45,7 +45,7 @@ control, params = load_config(is_network=True)
 Imean_ext   = 260.
 means = [260., ]
 # means = [260., 300.,]
-means = np.arange(220, 320+1, 40.)
+means = np.arange(220, 320+1, 20.)
 
 tags = (mean_tag, std_tag, mean_std_tag)
 # tags = (mean_tag, )

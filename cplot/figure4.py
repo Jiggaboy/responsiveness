@@ -45,8 +45,8 @@ control, params = load_config(is_network=True, no_stim=True)
 tags = (mean_tag, std_tag, mean_std_tag)
 # tags = (mean_tag, )
 
-ylim_delay = (0, 85)
-ylim_FR = (0, 15)
+ylim_delay = (0, 80)
+ylim_FR = (0, 14)
 xlim_time = (params.warmup + params.duration_pre - 15, params.warmup + params.duration_pre + 65)
     
 force = False
@@ -55,21 +55,20 @@ force = False
 pre_FR  =  5.
 post_FR = 10.
 FR_I = pre_FR
-# post_FR = 12.
+
 
 J = 0.025
-J = 0.005
-J = 0.025
+# J = 0.0125
 
 bootstraps        = 100
 samples_per_strap =  10#50
 
 means = np.asarray([220., 260., 300.])
-means = np.arange(220, 320+1, 40.)
+means = np.arange(220, 280+1, 20.)
 
 
 plot_mean = 260.
-# plot_mean = 220.
+plot_FF_mean = 280.
 Imean_ext = 260.
 
 
@@ -199,15 +198,15 @@ def main(params:object, control:object):
     
     
     
-    # ax = fig.add_subplot(gs[0, 2])
-    ax = fig.add_subplot(gs[:, :])
+    ax = fig.add_subplot(gs[0, 2])
+    # ax = fig.add_subplot(gs[:, :])
     ax.set(
         title="Set Points", 
         xlabel=xlabel_drive, ylabel=label_drive_std,
     )
     # ax.set_xticks([172.5, 260.])
-    ax.set_ylim((650, 900))
-    ax.set_xlim((240, 280))
+    ax.set_ylim((725, 890))
+    ax.set_xlim((242, 277))
     
     rnn = RNN(params, pre_FR, post_FR, FR_I, drive_Imean=Imean_ext)
     quiver_setpoints(ax, rnn, plot_mean)
@@ -241,9 +240,9 @@ def main(params:object, control:object):
     for l, label in enumerate(labels):
         neural_type = "E" if l < 3 else "I"
         labels_updated.append(rf"{label} ({neural_type})")
-    ax.legend(handles, labels_updated, loc="upper center", ncols=2, bbox_to_anchor=(0, 1, 1, 0.2))
+    ax.legend(handles, labels_updated, loc="upper center", ncols=2, bbox_to_anchor=(0, 1, 1, 0.36))
     
-    _, ax_tmp = plt.subplots(num="Network response")
+    _, ax_tmp = plt.subplots(num="Network Response")
     ax_tmp.set(title=title, **ax_kwargs)
     plot_axvline_at_change(params, control, ax_tmp)
     ax_tmp.set(xlim=xlim_time)
@@ -267,12 +266,14 @@ def main(params:object, control:object):
     #===============================================================================
     ## DELAY OVER MEAN -- VIOLIN
     ax_transient = fig.add_subplot(gs[1, 1])
-    title = f"Recovery Time\n(FR: {pre_FR} to {post_FR})" + "\n"
+    title = f"Recovery Time\n(FR: {pre_FR:.0f}Hz" + r"$\rightarrow$" + f"{post_FR:.0f}Hz)" + "\n"
 
     ax_transient.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, ylim=ylim_delay, title=title)
     ax_transient.set_xticks(means)
+    
+    df_tmp = df_delays[df_delays.index.isin(means, level="mean")]
     sns.violinplot(
-        df_delays, x="mean", y="delay", 
+        df_tmp, x="mean", y="delay", 
         hue="tag", 
         cut=0, 
         density_norm = "width", 
@@ -293,14 +294,14 @@ def main(params:object, control:object):
     plt.figure()
     plt.title(title)
     sns.violinplot(
-        df_delays, x="mean", y="delay", 
+        df_tmp, x="mean", y="delay", 
         hue="tag", 
         cut=0, 
         density_norm="width", 
         common_norm=True, 
         hue_order=hue_order, 
         palette = Color,
-        inner = None,
+        # inner = None,
         native_scale=True,
     )
     # #===============================================================================
@@ -364,8 +365,9 @@ def main(params:object, control:object):
     ax_CV = fig.add_subplot(gs[2, 2])
     ax_CV.set(ylabel=xlabel_drive, xlabel="FF", title=title)
     ax_CV.set_yticks(means)
+    df_tmp = Erates_CV[Erates_CV["mean"].isin(means)]
     sns.violinplot(
-        Erates_CV, x="FF", y="mean", 
+        df_tmp, x="FF", y="mean", 
         hue="tag", 
         cut=0, 
         density_norm="width", 
@@ -395,7 +397,7 @@ def main(params:object, control:object):
         ylabel = "Neuron ID", 
         xlim = (1155, 1205),
         ylim = (0, 6250),
-        title = f"Raster Plot\n(" + r"$\mu_{\mathrm{pre}}$=" + f"{plot_mean}pA; {Label[tmp_tag]})"
+        title = f"Raster Plot\n(" + r"$\mu_{\mathrm{pre}}$=" + f"{plot_FF_mean}pA; {Label[tmp_tag]})"
     )
     ax_raster.set_xticks([1160, 1180, 1200])
     ax_raster.ticklabel_format(axis="y", style="scientific", scilimits=(0, 2), useMathText=True)
@@ -411,7 +413,7 @@ def main(params:object, control:object):
     
     # fig, ax_sca = plt.subplots()
     with ResponseHdf5(tmp_filename, "a", metadata=params.metadata) as hfile:
-        rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=plot_mean)
+        rows = hfile.filter_rows(hfile.run, pre_FR=pre_FR, post_FR=post_FR, pre_mean=plot_FF_mean)
         run_ids = get_run_ids(rows, params, tmp_tag)
         target = hfile.get_node(hfile.data, f"run{run_ids[0]}")
         
@@ -513,13 +515,29 @@ def main(params:object, control:object):
     
     
     
-    _, ax_tmp = plt.subplots(num="FF Control")
-    ax_tmp.set(title=title, **ax_kwargs)
-    plot_axvline_at_change(params, control, ax_tmp)
-    ax_tmp.set(xlim=xlim_time)
-                
-    plot_FRs(pre_mean, df_rates, t_bins, ax_tmp, **plot_kwargs)
-    plot_FRs(plot_mean, df_Erates, t_bins, ax_tmp, **plot_kwargs, ls="--")
+    for mean in means:
+        rnn.set_up_network(mean, delta="mean")
+        pre_mean  = rnn.pre_Esetpoint[0]
+        
+        _, ax_tmp = plt.subplots(num=f"FF Control {mean}")
+        ax_tmp.set(title=title, **ax_kwargs)
+        plot_axvline_at_change(params, control, ax_tmp)
+        ax_tmp.set(xlim=xlim_time)
+                    
+        plot_FRs(pre_mean, df_rates, t_bins, ax_tmp, **plot_kwargs)
+        plot_FRs(mean, df_Erates, t_bins, ax_tmp, **plot_kwargs, ls="--")
+        
+        df_rates_tmp = df_rates.copy()
+        old_means = df_rates_tmp.index.get_level_values("mean").unique()
+        mapping = dict(zip(old_means, means))
+    
+        df_rates_tmp = df_rates_tmp.rename(index=mapping, level="mean")
+        
+        dftmp = df_rates_tmp - df_Erates[df_Erates.index.isin(means, level="mean")]
+        plot_FRs(mean, dftmp, t_bins, ax_tmp, **plot_kwargs, ls="dotted")
+        
+        ax_tmp.axhline()
+    
     
     #===============================================================================
     # PLOT - TRANSIENT ESTIMATES
@@ -530,6 +548,7 @@ def main(params:object, control:object):
     title = f"Recovery Time (Control)" + "\n"
     xticks = df_metrics.index.unique(level="mean")
     xticks = list(xticks)
+    ax_control_recovery.xaxis.set_major_formatter('{x:.0f}')
     ax_control_recovery.set(xlabel=xlabel_drive, ylabel=ylabel_recovery, xticks=xticks, ylim=ylim_delay, title=title)
 
     sns.violinplot(
@@ -561,7 +580,7 @@ def main(params:object, control:object):
         common_norm=True, 
         hue_order=hue_order,
         palette = Color,
-        inner = None,
+        # inner = None,
         native_scale=True,
     )
     
@@ -615,8 +634,13 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
     rnn.set_up_network(mean, delta="mean")
     # plt.scatter(x, y, s, c, marker, cmap, norm, vmin, vmax, alpha, linewidths)
     # Start: FF
-    ax.scatter(rnn.pre_drive_Emean, rnn.pre_drive_Estd, c=KTH_grey, zorder = 10,
-        s = 5,)
+    ax.scatter(
+        rnn.pre_drive_Emean, 
+        rnn.pre_drive_Estd, 
+        c=KTH_darkgrey, 
+        zorder = 10,
+        s = 6,
+    )
     
     # EE contribution
     # Example:
@@ -633,8 +657,10 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
     )
     # EI contribution
     ax.quiver(
-        rnn.pre_drive_Emean + rnn.pre_EE_mean, EE_quiver,
-        rnn.pre_EI_mean, rnn.pre_Esetpoint[1] - EE_quiver,
+        rnn.pre_drive_Emean + rnn.pre_EE_mean, 
+        EE_quiver,
+        rnn.pre_EI_mean, 
+        rnn.pre_Esetpoint[1] - EE_quiver,
         color=INH_NEURON,
         zorder = 4,
         **quiver_style,
@@ -643,9 +669,9 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
     # Start: Pre
     ax.scatter(
         *rnn.pre_Esetpoint,
-        c = KTH_grey,
+        c = KTH_darkgrey,
         zorder = 10,
-        s = 5,
+        s = 6,
     )
     
     for delta in tags:
@@ -663,6 +689,8 @@ def quiver_setpoints(ax:object, rnn:RNN, mean:float):
 
         deltadrive_std = np.sqrt(rnn.post_drive_Estd**2 - rnn.pre_drive_Estd**2)
         deltadrive_std = rnn.post_drive_Estd - rnn.pre_drive_Estd
+        pre_rec = np.sqrt(rnn.pre_Esetpoint[1]**2 - rnn.pre_drive_Estd**2)
+        deltadrive_std = np.sqrt(rnn.post_drive_Estd**2 + pre_rec**2) - rnn.pre_Esetpoint[1]
         
         # Delta Generator
         ax.quiver(

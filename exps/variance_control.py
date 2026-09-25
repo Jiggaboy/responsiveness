@@ -31,7 +31,7 @@ import seaborn as sns
 
 
 from config import load_config
-from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids, exc_tag
 
 from lib import siegert
@@ -40,7 +40,7 @@ from lib.analysis import get_transient, get_tbins, get_tstart, bootstrap
 
 from lib.conversion import spikecount_to_FR
 
-from cplot.constants import *
+from cplot.plot_constants import *
 
 #===============================================================================
 # CONTROL VARIABLES
@@ -56,12 +56,12 @@ plot_rate_and_delays = True
 plot_rate_and_delays = False
 
 force = False
-# force = True
+force = True
 #===============================================================================
 # CONSTANTS
 #===============================================================================
 bootstraps        = 100
-samples_per_strap =  15 if is_network else 50
+samples_per_strap =  10 if is_network else 50
 
     
 pre_FR = 2.

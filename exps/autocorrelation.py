@@ -27,7 +27,7 @@ from scipy.stats import entropy
 import seaborn as sns
 
 
-from plot_constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
+from constants import mean_tag, std_tag, delay_tag, entropy_tag, mean_std_tag, Label, Color, hue_order
 from config import load_config
 import lib.nest_interface as nif
 from lib.analysis import bootstrap, get_tbins, get_tstart
@@ -36,7 +36,7 @@ from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_sp
 from lib import siegert
 from lib.util import pairwise, save_figure, functimer
 
-from cplot.constants import *
+from cplot.plot_constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 
@@ -61,10 +61,8 @@ ylim_delay = (0, 125)
 #===============================================================================
 # CONSTANTS
 #===============================================================================
-hist_binwidth = 2. #ms
-
-bootstraps          = 10
-samples_per_strap   = 50
+bootstraps          = 100
+samples_per_strap   =  50
 
 
 pre_FR = 2.
@@ -137,7 +135,7 @@ def main():
         col = m % 3
         ax = fig.add_subplot(gs[row, col])
         
-        title = r"$\mu_{pre}$" + f"={int(mean)}pA"
+        title = r"$\mu_{\mathrm{pre}}$" + f"={int(mean)}pA"
         
         # TODO: Set the Figure title
         # plt.figure(f"Autocorrelation {mean}")
@@ -165,7 +163,7 @@ def main():
         # Expands the tuples into columns, and renames them
         acfs = acfs.apply(pd.Series) 
         acfs.rename(columns={0: "index", 1: "ac"}, inplace=True)
-        acfs["index"] *= hist_binwidth
+        acfs["index"] *= params.hist_binwidth
         
         # Converts from having a long list in a single cell to having them in the full column.
         long_acfs = acfs.reset_index().explode(['index', 'ac'])

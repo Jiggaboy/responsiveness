@@ -15,6 +15,7 @@ History:
 __author__ = 'Hauke Wernecke'
 __contact__ = 'hower@kth.se'
 __version__ = '0.2'
+
 #===============================================================================
 # IMPORT STATEMENTS
 #===============================================================================
@@ -99,19 +100,19 @@ class Params:
 @dataclass
 class NetworkParams(Params):    
     # Target-Source notation
-    # Indegree definition
-    # Fixed indegree
+    # Indegree definition; Fixed indegree
     C_EE: int               = 500
     C_EI: int               = 125
     C_IE: int               = 500
+    C_II: int               = 125
     # C_EI: int               = 500
     # C_IE: int               = 125
-    C_II: int               = 125
     
     # J = 0.005
-    J = 0.0125
+    J = 0.025
     g = 8
     gamma = 4 # The ratio of excitatory to inhibitory neurons
+    
     
     def __post_init__(self):
         super().__post_init__()

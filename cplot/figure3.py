@@ -23,7 +23,7 @@ import pandas as pd
 import seaborn as sns
 
 from config import load_config, Control, Params
-from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 
 from lib.analysis import bootstrap, get_tbins, get_tstart
 from lib.conversion import spikecount_to_FR
@@ -31,7 +31,7 @@ from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_sp
 import lib.nest_interface as nif
 from lib.util import save_figure
 
-from cplot.constants import *
+from cplot.plot_constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 #===============================================================================
@@ -482,7 +482,7 @@ def main():
                 handles, legend_labels = ax.get_legend_handles_labels()
                 for label in legend_labels:
                     labels.append(rf"{int(float(label))}ms")
-                ax.legend(handles, labels, ncols=2, bbox_to_anchor=(-0.03, 1, 1, 0.12), loc="upper left")
+                ax.legend(handles, labels, ncols=2, bbox_to_anchor=(-0.03, 1, 1, 0.10), loc="upper left")
         # continue
         #===============================================================================
         # STATISTICAL TESTS 
@@ -586,7 +586,7 @@ def main():
     for i, ((tag, mean), gb) in enumerate(df_delays_tmp.groupby(level=("tag", "mean"))):
         print(i, tag, mean)
         title = f"Stimulus Modality {Label[tag]}"
-        title_details = "\n" + r"$\mu_{pre}$=" + f"{mean:.0f}pA"
+        title_details = "\n" + r"$\mu_{\mathrm{pre}}$=" + f"{mean:.0f}pA"
     
         if tag == std_tag:
             ax = fig.add_subplot(gs[0, i%3])

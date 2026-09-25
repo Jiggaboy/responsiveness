@@ -22,14 +22,14 @@ import pandas as pd
 import seaborn as sns
 
 from config import load_config
-from plot_constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
+from constants import mean_tag, std_tag, delay_tag, mean_std_tag, Label, Color, hue_order
 
 from lib.analysis import bootstrap, get_tbins
 from lib.conversion import spikecount_to_FR
 from lib.responsehdf5 import ResponseHdf5, id_tag, load_and_merge_spikes, get_spikes_by_sender, get_run_ids
 from lib.util import save_figure
 
-from cplot.constants import *
+from cplot.plot_constants import *
 from cplot.aux import plot_axvline_at_change, plot_FRs, hist_delays
 
 
@@ -46,7 +46,7 @@ ylim_fr = (0, 21)
 pre_FR = 5
 post_FR = 10
 
-bootstraps = 20
+bootstraps = 100
 samples_per_strap = 50
     
 
@@ -126,7 +126,7 @@ def main():
     
     for m, mean in enumerate(means):
         ax = fig.add_subplot(gs[1, m])
-        title = "Activity over Time\n" + r"$\mu_{pre}$" + f"={int(mean)}pA"
+        title = "Activity over Time\n" + r"$\mu_{\mathrm{pre}}$" + f"={int(mean)}pA"
         if m == 0:
             ax.set(title=title, **ax_kwargs)
         else:
