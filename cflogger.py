@@ -36,7 +36,7 @@ LOG_FORMAT = "%(asctime)s - %(funcName)s: %(message)s"
 DEF_LOG_FILE = "./debug.log"
 
 
-def getLogger()->object:
+def getLogger()-> logging.Logger:
     """
     Returns the logger of the logging - lib. 
     Also ensures, that the initialization is done only once.

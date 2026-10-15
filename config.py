@@ -46,7 +46,7 @@ class Control:
 #===============================================================================
 @dataclass
 class Params:
-    control: object
+    control: Control
     N: int                  = 500
     seeds: int              = 200
     dt: float               = 0.1
