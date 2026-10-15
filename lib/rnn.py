@@ -163,7 +163,7 @@ class RNN:
         self.pre_IE_std = np.sqrt( from_free_Vm_to_generator( var_V=pre_IE_var, dt=params.dt ))
         self.pre_II_std = np.sqrt( from_free_Vm_to_generator( var_V=pre_II_var, dt=params.dt ))
         
-        self.pre_int_Istd  = np.sqrt(pre_int_Evar) # given in pA
+        self.pre_int_Istd  = np.sqrt( from_free_Vm_to_generator(var_V=(pre_IE_var + pre_II_var), dt=params.dt)) # given in pA
         
         
         # Mean
